@@ -83,16 +83,21 @@ private fun DrawScope.drawGlobe(c: Color) {
     val w = size.width; val h = size.height; val cx = w / 2f; val cy = h / 2f
     val r = size.minDimension * 0.40f
     val s = sw()
+    // Kugel
     drawCircle(c, radius = r, center = Offset(cx, cy), style = Stroke(width = s))
-    // Äquator + Meridiane (Ellipsen)
-    drawLine(c, Offset(cx - r, cy), Offset(cx + r, cy), strokeWidth = s * 0.8f)
-    val mer = Path().apply {
-        moveTo(cx, cy - r)
-        cubicTo(cx - r * 0.9f, cy - r * 0.5f, cx - r * 0.9f, cy + r * 0.5f, cx, cy + r)
-        cubicTo(cx + r * 0.9f, cy + r * 0.5f, cx + r * 0.9f, cy - r * 0.5f, cx, cy - r)
-        close()
-    }
-    strokePath(mer, c, s * 0.8f)
+    // Äquator
+    drawLine(c, Offset(cx - r, cy), Offset(cx + r, cy), strokeWidth = s * 0.7f)
+    // zwei Breitengrade (innerhalb der Kugel verkürzt)
+    val ly = r * 0.45f; val lx = r * 0.89f
+    drawLine(c, Offset(cx - lx, cy - ly), Offset(cx + lx, cy - ly), strokeWidth = s * 0.6f)
+    drawLine(c, Offset(cx - lx, cy + ly), Offset(cx + lx, cy + ly), strokeWidth = s * 0.6f)
+    // Meridian (senkrechte Ellipse durch die Pole)
+    drawOval(
+        c,
+        topLeft = Offset(cx - r * 0.5f, cy - r),
+        size = Size(r, r * 2f),
+        style = Stroke(width = s * 0.7f)
+    )
 }
 
 private fun DrawScope.drawHome(c: Color) {
@@ -257,11 +262,22 @@ private fun DrawScope.drawCard(c: Color) {
 
 private fun DrawScope.drawBooks(c: Color) {
     val w = size.width; val h = size.height; val s = sw() * 0.8f
-    // zwei liegende Bücher (gestapelt)
-    drawRoundRectCompat(c, Offset(w * 0.20f, h * 0.56f), Size(w * 0.60f, h * 0.20f), w * 0.03f, stroke = s)
-    drawRoundRectCompat(c, Offset(w * 0.24f, h * 0.34f), Size(w * 0.52f, h * 0.20f), w * 0.03f, stroke = s)
-    // ein stehendes Buch
-    drawRoundRectCompat(c, Offset(w * 0.62f, h * 0.28f), Size(w * 0.16f, h * 0.48f), w * 0.03f, stroke = s)
+    val bh = h * 0.17f
+    // drei gestapelte, liegende Bücher mit leicht versetzten Kanten
+    val books = listOf(
+        Triple(w * 0.18f, h * 0.60f, w * 0.62f),
+        Triple(w * 0.24f, h * 0.40f, w * 0.54f),
+        Triple(w * 0.16f, h * 0.20f, w * 0.58f)
+    )
+    books.forEach { (x, y, bw) ->
+        drawRoundRectCompat(c, Offset(x, y), Size(bw, bh), w * 0.03f, stroke = s)
+        // Seiten-Andeutung: kurze senkrechte Linie nahe der rechten Kante
+        line(
+            Offset(x + bw - w * 0.06f, y + bh * 0.20f),
+            Offset(x + bw - w * 0.06f, y + bh * 0.80f),
+            c, s * 0.7f
+        )
+    }
 }
 
 private fun DrawScope.drawScroll(c: Color) {
@@ -290,18 +306,38 @@ private fun DrawScope.drawArrowUp(c: Color) {
 
 private fun DrawScope.drawHourglass(c: Color) {
     val w = size.width; val h = size.height; val s = sw()
-    line(Offset(w * 0.28f, h * 0.18f), Offset(w * 0.72f, h * 0.18f), c, s)
-    line(Offset(w * 0.28f, h * 0.82f), Offset(w * 0.72f, h * 0.82f), c, s)
+    // Deckel + Boden (kräftiger, abgerundet)
+    line(Offset(w * 0.26f, h * 0.16f), Offset(w * 0.74f, h * 0.16f), c, s * 1.2f)
+    line(Offset(w * 0.26f, h * 0.84f), Offset(w * 0.74f, h * 0.84f), c, s * 1.2f)
+    // Glas-Silhouette (Sanduhr-Form)
     val glass = Path().apply {
-        moveTo(w * 0.30f, h * 0.18f)
-        lineTo(w * 0.70f, h * 0.18f)
+        moveTo(w * 0.32f, h * 0.17f)
+        lineTo(w * 0.68f, h * 0.17f)
         lineTo(w * 0.50f, h * 0.50f)
-        lineTo(w * 0.70f, h * 0.82f)
-        lineTo(w * 0.30f, h * 0.82f)
+        lineTo(w * 0.68f, h * 0.83f)
+        lineTo(w * 0.32f, h * 0.83f)
         lineTo(w * 0.50f, h * 0.50f)
         close()
     }
     strokePath(glass, c, s)
+    // Sand oben (gefülltes Dreieck)
+    val sandTop = Path().apply {
+        moveTo(w * 0.37f, h * 0.29f)
+        lineTo(w * 0.63f, h * 0.29f)
+        lineTo(w * 0.50f, h * 0.49f)
+        close()
+    }
+    drawPath(sandTop, c)
+    // Sand unten (kleiner Haufen)
+    val sandBot = Path().apply {
+        moveTo(w * 0.40f, h * 0.82f)
+        lineTo(w * 0.60f, h * 0.82f)
+        lineTo(w * 0.50f, h * 0.67f)
+        close()
+    }
+    drawPath(sandBot, c)
+    // rieselnder Sand (dünne Mittellinie)
+    line(Offset(w * 0.50f, h * 0.50f), Offset(w * 0.50f, h * 0.70f), c, s * 0.5f)
 }
 
 private fun DrawScope.drawTrophy(c: Color) {
