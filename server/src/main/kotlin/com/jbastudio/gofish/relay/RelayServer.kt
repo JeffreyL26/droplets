@@ -1,11 +1,16 @@
 package com.jbastudio.gofish.relay
 
 import io.ktor.server.application.Application
+import io.ktor.server.application.call
 import io.ktor.server.application.install
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
+import io.ktor.server.response.respondText
+import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
 import io.ktor.server.websocket.WebSockets
+import io.ktor.server.websocket.pingPeriod
+import io.ktor.server.websocket.timeout
 import io.ktor.server.websocket.webSocket
 import io.ktor.websocket.Frame
 import io.ktor.websocket.WebSocketSession
@@ -54,6 +59,10 @@ fun Application.relayModule() {
         maxFrameSize = Long.MAX_VALUE
     }
     routing {
+        // Health-Check / Browser-Test — bestätigt, dass der Server läuft.
+        get("/") {
+            call.respondText("Go Fish! relay läuft. WebSocket-Endpunkt: ${RelayPaths.WS}")
+        }
         webSocket(RelayPaths.WS) {
             val me = Peer(this)
             try {

@@ -1,0 +1,21 @@
+# Render-Blueprint für den Go Fish! Relay-Server (kostenloser Plan, Docker).
+#
+# So deployst du:
+#   1. Repo zu GitHub pushen (ist bereits passiert).
+#   2. Auf https://dashboard.render.com → "New +" → "Blueprint".
+#   3. Repo "droplets" auswählen → Render liest diese Datei und legt den Dienst an.
+#   4. "Apply" klicken. Nach dem Build bekommst du eine URL wie
+#      https://gofish-relay-XXXX.onrender.com
+#   5. In der App-Konstante DEFAULT_RELAY_URL eintragen als:
+#      wss://gofish-relay-XXXX.onrender.com/ws
+#
+# Hinweis: Der kostenlose Plan "schläft" nach ~15 min Inaktivität ein; der erste
+# Suchlauf danach dauert ~30–60 s, bis der Server wieder hochfährt.
+services:
+  - type: web
+    name: gofish-relay
+    runtime: docker
+    rootDir: server
+    plan: free
+    healthCheckPath: /
+    autoDeploy: true

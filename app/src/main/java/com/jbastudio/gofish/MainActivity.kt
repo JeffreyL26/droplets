@@ -75,8 +75,10 @@ class MainActivity : ComponentActivity() {
                 var mode    by remember { mutableStateOf<Mode?>(null) }
                 var avatarChoice  by remember { mutableStateOf(GameHolder.myAvatar) }
                 var showAvatarDlg by remember { mutableStateOf(false) }
-                var screen   by remember { mutableStateOf(Screen.MENU) }
-                var relayUrl by remember { mutableStateOf(netPrefs.loadRelayUrl()) }
+                var screen         by remember { mutableStateOf(Screen.MENU) }
+                // Optionaler, vom Nutzer gesetzter Server (z. B. zum Testen). Leer = Standard.
+                var serverOverride by remember { mutableStateOf(netPrefs.loadRelayUrl()) }
+                var showServerDlg  by remember { mutableStateOf(false) }
                 // Token-Container: jeder Connect-Versuch bekommt eine eigene ID;
                 // wird sie inkrementiert, sind alle laufenden Callbacks "stale" und werden ignoriert.
                 val attempt = remember { intArrayOf(0) }
@@ -125,6 +127,42 @@ class MainActivity : ComponentActivity() {
                     screen = Screen.MENU
                 }
 
+                // Online-Matchmaking SOFORT starten — keine Eingabe nötig.
+                // Adresse: optionaler Override, sonst die fest hinterlegte Standard-Adresse.
+                val startMatchmaking: () -> Unit = {
+                    val url = serverOverride.ifBlank { DEFAULT_RELAY_URL }.trim()
+                    isError = false
+                    screen  = Screen.ONLINE
+                    if (url.isEmpty()) {
+                        // Noch kein Server hinterlegt → Hinweis statt Suche
+                        busy    = false
+                        mode    = null
+                        status  = "Online-Server ist noch nicht eingerichtet."
+                        isError = true
+                    } else {
+                        val finalName = name.trim().ifEmpty { "Spieler" }
+                        val myToken = ++attempt[0]
+                        busy   = true
+                        mode   = Mode.ONLINE
+                        status = "Suche nach Gegner …"
+                        findOnlineMatch(
+                            relayUrl = url,
+                            name     = finalName,
+                            token    = myToken,
+                            onUpdate = { s, err ->
+                                if (attempt[0] == myToken) runOnUiThread {
+                                    status  = s
+                                    isError = err
+                                    if (err) { busy = false; mode = null }
+                                }
+                            },
+                            onSessionStart = {
+                                if (attempt[0] == myToken) { busy = false; mode = null; status = "" }
+                            }
+                        )
+                    }
+                }
+
                 if (showAvatarDlg) {
                     AvatarSelectionDialog(
                         currentChoice = avatarChoice,
@@ -137,60 +175,43 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
+                if (showServerDlg) {
+                    ServerDialog(
+                        current = serverOverride,
+                        defaultUrl = DEFAULT_RELAY_URL,
+                        onSave = { url ->
+                            serverOverride = url.trim()
+                            netPrefs.saveRelayUrl(url.trim())
+                            showServerDlg = false
+                        },
+                        onUseDefault = {
+                            serverOverride = ""
+                            netPrefs.saveRelayUrl("")
+                            showServerDlg = false
+                        },
+                        onClose = { showServerDlg = false }
+                    )
+                }
+
                 when (screen) {
                   Screen.MENU -> MainMenuScreen(
                       name          = name,
                       onNameChange  = { name = it },
                       avatar        = avatarChoice,
                       onAvatarClick = { showAvatarDlg = true },
-                      onFindGame    = { goTo(Screen.ONLINE) },
+                      onFindGame    = startMatchmaking,
                       onLocalHost   = { goTo(Screen.LOCAL) }
                   )
 
                   Screen.ONLINE -> OnlineScreen(
-                      name           = name,
-                      onNameChange   = { name = it },
-                      avatar         = avatarChoice,
-                      onAvatarClick  = { showAvatarDlg = true },
-                      relayUrl       = relayUrl,
-                      onRelayUrlChange = { relayUrl = it; netPrefs.saveRelayUrl(it.trim()) },
-                      status         = status,
-                      isError        = isError,
-                      busy           = busy,
-                      onBack         = backToMenu,
-                      onCancel       = cancel,
-                      onFind = {
-                          val url = relayUrl.trim()
-                          if (url.isEmpty()) {
-                              status = "Bitte Server-URL eingeben"
-                              isError = true
-                          } else {
-                              netPrefs.saveRelayUrl(url)
-                              val finalName = name.trim().ifEmpty { "Spieler" }
-                              val myToken = ++attempt[0]
-                              busy    = true
-                              isError = false
-                              mode    = Mode.ONLINE
-                              status  = "Suche nach Gegner …"
-                              findOnlineMatch(
-                                  relayUrl = url,
-                                  name     = finalName,
-                                  token    = myToken,
-                                  onUpdate = { s, err ->
-                                      if (attempt[0] == myToken) runOnUiThread {
-                                          status  = s
-                                          isError = err
-                                          if (err) { busy = false; mode = null }
-                                      }
-                                  },
-                                  onSessionStart = {
-                                      if (attempt[0] == myToken) {
-                                          busy = false; mode = null; status = ""
-                                      }
-                                  }
-                              )
-                          }
-                      }
+                      status           = status,
+                      isError          = isError,
+                      busy             = busy,
+                      serverConfigured = serverOverride.ifBlank { DEFAULT_RELAY_URL }.isNotBlank(),
+                      onBack           = backToMenu,
+                      onCancel         = cancel,
+                      onRetry          = startMatchmaking,
+                      onEditServer     = { showServerDlg = true }
                   )
 
                   Screen.LOCAL -> LobbyScreen(
@@ -515,20 +536,27 @@ private fun MainMenuScreen(
 //  Online-Bildschirm (Matchmaking über das Relay)
 // ═════════════════════════════════════════════════════════════════════════
 
+/**
+ * Fest hinterlegte Adresse des Online-Relay-Servers — analog zu Clash Royale,
+ * wo die Server-Adresse in der App steckt und der Spieler nichts eingibt.
+ *
+ * HIER nach dem Deployen die öffentliche Adresse eintragen, z. B.:
+ *   "wss://gofish-relay.onrender.com/ws"
+ *
+ * Leer = noch nicht eingerichtet (App zeigt dann einen Hinweis).
+ */
+private const val DEFAULT_RELAY_URL = ""
+
 @Composable
 private fun OnlineScreen(
-    name: String,
-    onNameChange: (String) -> Unit,
-    avatar: AvatarChoice,
-    onAvatarClick: () -> Unit,
-    relayUrl: String,
-    onRelayUrlChange: (String) -> Unit,
     status: String,
     isError: Boolean,
     busy: Boolean,
+    serverConfigured: Boolean,
     onBack: () -> Unit,
     onCancel: () -> Unit,
-    onFind: () -> Unit
+    onRetry: () -> Unit,
+    onEditServer: () -> Unit
 ) {
     OceanBackground {
         Column(
@@ -542,7 +570,7 @@ private fun OnlineScreen(
             BackRow(text = "Hauptmenü", enabled = !busy, onBack = onBack)
 
             Text(
-                text  = "Online spielen",
+                text  = "Spiel finden",
                 style = MaterialTheme.typography.displayLarge.copy(
                     fontSize = 42.sp, fontWeight = FontWeight.Black
                 ),
@@ -550,119 +578,195 @@ private fun OnlineScreen(
                 textAlign = TextAlign.Center
             )
             Text(
-                text = "Finde einen Gegner im Internet",
+                text = "Automatisch mit einem Gegner verbinden",
                 style = MaterialTheme.typography.titleMedium,
                 color = SoftSeaText,
                 textAlign = TextAlign.Center
             )
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(28.dp))
 
-            PlayerCard(
-                name          = name,
-                onNameChange  = onNameChange,
-                avatar        = avatar,
-                onAvatarClick = onAvatarClick,
-                enabled       = !busy
-            )
-
-            Spacer(Modifier.height(14.dp))
-
-            // Karte: Relay-Server
-            BubblePanel(modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(18.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        SectionLabel("Relay-Server")
-                        Spacer(Modifier.weight(1f))
-                        Text("🛰️", fontSize = 22.sp)
+            when {
+                busy -> {
+                    // Suche läuft — Maskottchen + Status + Abbrechen
+                    BubblePanel(
+                        modifier = Modifier.fillMaxWidth(),
+                        background = SunYellow.copy(alpha = 0.92f)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(22.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            FishMascot(
+                                modifier = Modifier.size(width = 110.dp, height = 80.dp),
+                                body = SeafoamGreen, bodyDeep = SeafoamDeep,
+                                facingRight = true
+                            )
+                            Spacer(Modifier.height(10.dp))
+                            Text(
+                                text = status.ifEmpty { "Suche nach Gegner …" },
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = TextAlign.Center,
+                                color = DeepSea,
+                                style = MaterialTheme.typography.titleLarge
+                            )
+                            Text(
+                                "Warte auf einen anderen Spieler, der gerade sucht.",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 4.dp),
+                                textAlign = TextAlign.Center,
+                                color = SoftSeaText,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Spacer(Modifier.height(16.dp))
+                            PastelButton(
+                                text = "Suche abbrechen",
+                                emoji = "✋",
+                                enabled = true,
+                                container = CoralDeep,
+                                onClick = onCancel
+                            )
+                        }
                     }
-                    Spacer(Modifier.height(8.dp))
-                    PastelTextField(
-                        value = relayUrl,
-                        onChange = onRelayUrlChange,
-                        placeholder = "wss://dein-server.com/ws",
-                        enabled = !busy
+                }
+
+                !serverConfigured -> {
+                    // Kein Server hinterlegt → Setup-Hinweis
+                    BubblePanel(
+                        modifier = Modifier.fillMaxWidth(),
+                        background = CoralPink.copy(alpha = 0.92f)
+                    ) {
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(18.dp)
+                        ) {
+                            Text(
+                                "Online-Server noch nicht eingerichtet",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = DeepSea
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                "Damit sich Spieler über das Internet automatisch finden, " +
+                                    "muss einmalig ein Relay-Server laufen. Trag seine Adresse hier ein.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = DeepSea
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(16.dp))
+                    PastelButton(
+                        text = "Server festlegen",
+                        emoji = "🛰️",
+                        enabled = true,
+                        container = SeafoamGreen,
+                        onClick = onEditServer
                     )
-                    Spacer(Modifier.height(6.dp))
+                }
+
+                else -> {
+                    // Bereit (z. B. nach Abbruch / Fehler / Spielende) → erneut suchen
+                    PastelButton(
+                        text = "Spiel finden",
+                        emoji = "🔎",
+                        enabled = true,
+                        container = SeafoamGreen,
+                        onClick = onRetry
+                    )
+                    if (status.isNotEmpty()) {
+                        Spacer(Modifier.height(14.dp))
+                        BubblePanel(
+                            modifier = Modifier.fillMaxWidth(),
+                            background = if (isError) CoralPink.copy(alpha = 0.92f)
+                                         else         Lavender.copy(alpha = 0.85f)
+                        ) {
+                            Text(
+                                text = status,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                textAlign = TextAlign.Center,
+                                color = DeepSea,
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(18.dp))
+                    // Dezente Option (Tests / eigener Server)
+                    TextButton(onClick = onEditServer) {
+                        Text("Server ändern", color = SoftSeaText)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Optionaler Server-Override (Tests / eigener Server). Leer = Standard-Server der App. */
+@Composable
+private fun ServerDialog(
+    current: String,
+    defaultUrl: String,
+    onSave: (String) -> Unit,
+    onUseDefault: () -> Unit,
+    onClose: () -> Unit
+) {
+    var text by remember { mutableStateOf(current) }
+    Dialog(
+        onDismissRequest = onClose,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        BubblePanel(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+            background = Foam,
+            cornerRadius = 28.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 22.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text("Server-Adresse", style = MaterialTheme.typography.headlineLarge, color = DeepSea)
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "Nur zum Testen oder für einen eigenen Server nötig. " +
+                        "Leer lassen = Standard-Server der App.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = SoftSeaText,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.height(16.dp))
+                PastelTextField(
+                    value = text,
+                    onChange = { text = it },
+                    placeholder = "wss://dein-server.com/ws"
+                )
+                if (defaultUrl.isNotBlank()) {
+                    Spacer(Modifier.height(8.dp))
                     Text(
-                        "Adresse deines Relay-Servers (wss://… empfohlen).",
-                        style = MaterialTheme.typography.bodyMedium,
+                        "Standard: $defaultUrl",
+                        style = MaterialTheme.typography.bodySmall,
                         color = SoftSeaText
                     )
                 }
-            }
-
-            Spacer(Modifier.height(18.dp))
-
-            if (busy) {
-                // Suche läuft — Status + Abbrechen
-                BubblePanel(
-                    modifier = Modifier.fillMaxWidth(),
-                    background = SunYellow.copy(alpha = 0.92f)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(18.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        FishMascot(
-                            modifier = Modifier.size(width = 96.dp, height = 70.dp),
-                            body = SeafoamGreen, bodyDeep = SeafoamDeep,
-                            facingRight = true
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            text = status.ifEmpty { "Suche nach Gegner …" },
-                            modifier = Modifier.fillMaxWidth(),
-                            textAlign = TextAlign.Center,
-                            color = DeepSea,
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        Spacer(Modifier.height(14.dp))
-                        PastelButton(
-                            text = "Suche abbrechen",
-                            emoji = "✋",
-                            enabled = true,
-                            container = CoralDeep,
-                            onClick = onCancel
-                        )
-                    }
-                }
-            } else {
+                Spacer(Modifier.height(20.dp))
                 PastelButton(
-                    text = "Spiel finden",
-                    emoji = "🔎",
-                    enabled = relayUrl.isNotBlank(),
+                    text = "Übernehmen",
+                    emoji = "✓",
+                    enabled = text.isNotBlank(),
                     container = SeafoamGreen,
-                    onClick = onFind
+                    onClick = { onSave(text) }
                 )
-                if (relayUrl.isBlank()) {
-                    Spacer(Modifier.height(10.dp))
-                    Text(
-                        "Bitte zuerst die Server-Adresse eintragen.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = SoftSeaText,
-                        textAlign = TextAlign.Center
-                    )
-                }
-                if (status.isNotEmpty()) {
-                    Spacer(Modifier.height(12.dp))
-                    BubblePanel(
-                        modifier = Modifier.fillMaxWidth(),
-                        background = if (isError) CoralPink.copy(alpha = 0.92f)
-                                     else         Lavender.copy(alpha = 0.85f)
-                    ) {
-                        Text(
-                            text = status,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(14.dp),
-                            textAlign = TextAlign.Center,
-                            color = DeepSea,
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                    }
+                Spacer(Modifier.height(8.dp))
+                TextButton(onClick = onUseDefault) {
+                    Text("Standard verwenden", color = SoftSeaText)
                 }
             }
         }
