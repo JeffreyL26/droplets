@@ -5,7 +5,7 @@ import com.jbastudio.gofish.ui.components.AvatarColor
 import com.jbastudio.gofish.ui.components.AvatarKind
 
 /** Verfügbare Sprachen. Standard ist Deutsch. */
-enum class Language(val tag: String) { DE("de"), ES("es") }
+enum class Language(val tag: String) { DE("de"), ES("es"), EN("en") }
 
 fun languageFromTag(tag: String?): Language =
     Language.entries.firstOrNull { it.tag == tag } ?: Language.DE
@@ -14,6 +14,7 @@ fun languageFromTag(tag: String?): Language =
 fun textsFor(language: Language): Texts = when (language) {
     Language.DE -> DeTexts
     Language.ES -> EsTexts
+    Language.EN -> EnTexts
 }
 
 /** Aktuelle Texte für Composables. */
@@ -465,4 +466,155 @@ object EsTexts : Texts {
     override val animCaught = "¡pescado!"
     override val animBook = "📚  ¡CUARTETO!"
     override fun animBookComplete(rank: String) = "$rank completo"
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  ENGLISH
+// ════════════════════════════════════════════════════════════════════════════
+
+object EnTexts : Texts {
+    override val tagline = "Reel in your catch!"
+    override val findGame = "Find a game!"
+    override val hostLocal = "Host locally"
+
+    override val yourName = "Your name"
+    override val namePlaceholder = "e.g. Captain Nemo"
+    override val yourAvatar = "Your avatar"
+    override fun avatarSummary(kind: String, color: String) = "$kind · $color"
+
+    override val chooseAvatarTitle = "Choose an avatar"
+    override val chooseAvatarSubtitle = "Pick a sea creature."
+    override val colorLabel = "Color"
+    override val doneBtn = "Done"
+    override fun kindName(kind: AvatarKind) = when (kind) {
+        AvatarKind.FISH -> "Fish"
+        AvatarKind.SHARK -> "Shark"
+        AvatarKind.WHALE -> "Whale"
+        AvatarKind.DOLPHIN -> "Dolphin"
+        AvatarKind.PUFFER -> "Pufferfish"
+        AvatarKind.STARFISH -> "Starfish"
+    }
+    override fun colorName(color: AvatarColor) = when (color) {
+        AvatarColor.SUN -> "Sunny"
+        AvatarColor.CORAL -> "Coral"
+        AvatarColor.SEAFOAM -> "Seafoam"
+        AvatarColor.LAVENDER -> "Lavender"
+        AvatarColor.OCEAN -> "Ocean"
+        AvatarColor.SANDY -> "Sandy"
+    }
+
+    override val mainMenu = "Main menu"
+
+    override val localTitle = "Local play"
+    override val localSubtitle = "Host or join on the same Wi-Fi"
+    override val hostGame = "Host game"
+    override fun yourIp(ip: String) = "Your IP: $ip"
+    override val startServer = "Start server"
+    override val joinGame = "Join game"
+    override val hostIpPlaceholder = "Host IP (e.g. 192.168.0.42)"
+    override val enterHostIp = "Please enter the host IP"
+    override val joinBtn = "Join"
+
+    override val hostingDialogTitle = "Host game"
+    override val shareIp = "Share this IP with your opponent:"
+    override val waitingForCoPlayer = "Waiting for another player …"
+    override val cancelHosting = "Cancel hosting"
+    override val cancelConnection = "Cancel connection"
+
+    override val findGameTitle = "Find a game"
+    override val onlineSubtitle = "Connect with an opponent automatically"
+    override val searchingOpponent = "Looking for an opponent …"
+    override val waitingForPlayer = "Waiting for another player who's searching."
+    override val cancelSearch = "Cancel search"
+    override val serverNotConfiguredTitle = "Online server not set up yet"
+    override val serverNotConfiguredBody =
+        "For players to find each other automatically over the internet, a relay server " +
+            "must be running. Enter its address here."
+    override val setServer = "Set server"
+    override val changeServer = "Change server"
+    override val opponentFound = "Opponent found! Starting …"
+
+    override val serverAddressTitle = "Server address"
+    override val serverDialogBody =
+        "Only needed for testing or your own server. Leave empty = the app's default server."
+    override fun defaultServerLabel(url: String) = "Default: $url"
+    override val applyBtn = "Apply"
+    override val useDefaultBtn = "Use default"
+
+    override val startingServer = "Starting server …"
+    override fun connectingTo(ip: String) = "Connecting to $ip …"
+    override val hostingCancelled = "Hosting cancelled."
+    override val searchCancelled = "Search cancelled."
+    override val operationCancelled = "Operation cancelled."
+    override val connectedWaiting = "Connected! Waiting for the game to start …"
+    override val serverNotSetUp = "The online server isn't set up yet."
+    override val defaultNamePlayer = "Player"
+    override val defaultNameHost = "Host"
+    override val defaultNameGuest = "Guest"
+
+    override val errHostingEnded = "Hosting ended."
+    override val errConnectionLost = "The connection was lost."
+    override val errServerConnLost = "Lost connection to the server."
+    override val errInvalidServer = "Server address invalid or unreachable."
+    override val errServerUnreachableRelay = "Server unreachable — is the relay server running?"
+    override val errServerUnreachableIp = "Server unreachable — is the IP correct?"
+    override val errTimeout = "Timed out — the server isn't responding."
+    override val errNoNetwork = "No network available."
+    override val errNoRoute = "Server unreachable at this IP."
+    override val errPermission = "Access denied. Does the app have network permission?"
+    override fun errGeneric(raw: String) = "Error: $raw"
+    override val unknownIp = "Unknown"
+
+    override val you = "You"
+    override val opponentDefault = "Opponent"
+    override fun gameStartedAs(name: String) = "🎬 Game started — you're playing as $name"
+    override fun youAskedGot(opponent: String, rank: String, n: Int) =
+        "asked for $rank → $opponent gives you $n card(s) — go again."
+    override fun youAskedGoFish(rank: String) = "asked for $rank → Go Fish!"
+    override fun drawnCard(card: String) = "   ↳ Drawn: $card"
+    override fun drawnCardHit(card: String) = "   ↳ Drawn: $card  ✓ Match — go again."
+    override val deckEmpty = "   ↳ The deck is empty."
+    override fun oppAskedGot(rank: String, n: Int) = "asked for $rank → takes $n card(s) from you."
+    override fun oppAskedGoFish(rank: String, wentFishing: Boolean) =
+        "asked for $rank → Go Fish!" + if (wentFishing) " Draws a card." else ""
+    override fun youBook(rank: String) = "completed a book of ${rank}s!"
+    override fun oppBook(rank: String) = "completed a book of ${rank}s!"
+    override val gameOverLog = "🏁 Game over."
+    override val toastNoSuchCard = "That card doesn't exist."
+    override fun toastMustHold(rank: String) = "You must hold at least one $rank card!"
+    override fun opponentLeft(opponent: String) = "$opponent left the game.\nThe session will end."
+    override val connectionLostSession = "Lost connection to the other player.\nThe session will end."
+
+    override val deckBadge = "🎴 Deck"
+    override val yourBooks = "Your books"
+    override fun handAndBooks(cards: Int, books: Int) = "🃏 $cards cards   📚 $books books"
+    override val yourHand = "Your hand"
+    override val scrollHint = "↕ scroll"
+    override val noCardsLeft = "No cards left."
+    override val logEmpty = "🌊 Nothing yet …"
+    override val chooseCard = "Choose a card"
+    override fun askFor(rank: String) = "Ask for $rank"
+    override val turnYou = "⬆️  Your turn — pick a card!"
+    override fun turnWaiting(opponent: String) = "⏳  Waiting for $opponent …"
+    override fun turnGameOver(winner: String) = "🏆 Game over — $winner wins!"
+    override val exitTitle = "Leave the game?"
+    override val exitBody = "Are you sure you want to leave? This will end the session."
+    override val leaveBtn = "Leave"
+    override val stayBtn = "Stay"
+    override val sessionEndedTitle = "🌊 Session ended"
+    override val toLobbyBtn = "To lobby"
+    override val winTitle = "Victory!"
+    override val loseTitle = "Defeat"
+    override val tieTitle = "Draw"
+    override val winSubtitle = "You collected the most books!"
+    override fun loseSubtitle(winner: String) = "$winner won the game."
+    override val tieSubtitle = "It's a tie — both have the same number of books."
+    override val toMainMenu = "To main menu"
+    override val drawWord = "Draw"
+
+    override val animDrawCard = "you draw a card"
+    override val animDeckEmpty = "The deck is empty"
+    override val animCaught = "caught!"
+    override val animBook = "📚  BOOK!"
+    override fun animBookComplete(rank: String) = "$rank complete"
 }

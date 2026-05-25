@@ -578,6 +578,7 @@ private fun LanguageSelector(
         verticalAlignment = Alignment.CenterVertically
     ) {
         FlagButton(R.drawable.flag_de, selected = current == Language.DE) { onSelect(Language.DE) }
+        FlagButton(R.drawable.flag_en, selected = current == Language.EN) { onSelect(Language.EN) }
         FlagButton(R.drawable.flag_es, selected = current == Language.ES) { onSelect(Language.ES) }
     }
 }

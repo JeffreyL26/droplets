@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Union Jack (Vereinigtes Königreich) als Sprach-Icon für Englisch.
+  Selbst erstellte, vereinfachte Vektorgrafik — frei nutzbar (symmetrischer
+  Saltire statt heraldisch versetztem, bei Icon-Größe bewusst reduziert).
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="60dp"
+    android:height="40dp"
+    android:viewportWidth="60"
+    android:viewportHeight="40">
+
+    <!-- Blaues Feld -->
+    <path android:fillColor="#012169" android:pathData="M0,0 H60 V40 H0 Z" />
+
+    <!-- Weißer Schräg-Saltire (St. Andrew + St. Patrick fimbriation) -->
+    <path android:strokeColor="#FFFFFF" android:strokeWidth="9" android:strokeLineCap="square"
+        android:pathData="M0,0 L60,40 M60,0 L0,40" />
+    <!-- Roter Schräg-Saltire (St. Patrick) -->
+    <path android:strokeColor="#C8102E" android:strokeWidth="3.5" android:strokeLineCap="square"
+        android:pathData="M0,0 L60,40 M60,0 L0,40" />
+
+    <!-- Weißes Kreuz (St. George fimbriation): vertikal + horizontal -->
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M23,0 H37 V40 H23 Z M0,13 H60 V27 H0 Z" />
+    <!-- Rotes Kreuz (St. George): vertikal + horizontal -->
+    <path android:fillColor="#C8102E"
+        android:pathData="M26,0 H34 V40 H26 Z M0,16 H60 V24 H0 Z" />
+</vector>
