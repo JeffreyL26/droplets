@@ -156,6 +156,13 @@ interface Texts {
     val toMainMenu: String
     /** Lokalisierte Anzeige für ein Unentschieden (Server-Sentinel bleibt sprachneutral). */
     val drawWord: String
+
+    // ── Animations-Overlays (Untertitel; "Go Fish!" bleibt unübersetzt) ──
+    val animDrawCard: String
+    val animDeckEmpty: String
+    val animCaught: String
+    val animBook: String
+    fun animBookComplete(rank: String): String
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -301,6 +308,12 @@ object DeTexts : Texts {
     override val tieSubtitle = "Gleichstand — beide haben gleich viele Bücher."
     override val toMainMenu = "Zum Hauptmenü"
     override val drawWord = "Unentschieden"
+
+    override val animDrawCard = "du ziehst eine Karte"
+    override val animDeckEmpty = "Deck ist leer"
+    override val animCaught = "geangelt!"
+    override val animBook = "📚  BUCH!"
+    override fun animBookComplete(rank: String) = "${rank}er komplett"
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -446,4 +459,10 @@ object EsTexts : Texts {
     override val tieSubtitle = "Empate: ambos tienen la misma cantidad de cuartetos."
     override val toMainMenu = "Al menú principal"
     override val drawWord = "Empate"
+
+    override val animDrawCard = "robas una carta"
+    override val animDeckEmpty = "El mazo está vacío"
+    override val animCaught = "¡pescado!"
+    override val animBook = "📚  ¡CUARTETO!"
+    override fun animBookComplete(rank: String) = "$rank completo"
 }

@@ -107,9 +107,13 @@ class GameActivity : ComponentActivity() {
                                 state.myHand.none { it.rank == rank } ->
                                     toast(T.toastMustHold(rank))
                                 else -> {
-                                    GameHolder.client?.sendAsk(rank)
+                                    // WICHTIG: erst sperren, DANN senden. Beim Online-Host wird die
+                                    // ASK_RESULT-Antwort synchron (inline) verarbeitet — würde myTurn
+                                    // hier NACH dem Senden gesetzt, überschriebe diese Zeile den
+                                    // korrekten Extra-Zug (yourTurn=true) wieder mit false → Deadlock.
                                     state.selectedRank = null
                                     state.myTurn = false  // gesperrt bis Antwort kommt
+                                    GameHolder.client?.sendAsk(rank)
                                 }
                             }
                         }

@@ -49,6 +49,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.jbastudio.gofish.i18n.LocalTexts
 import com.jbastudio.gofish.model.Card
 import com.jbastudio.gofish.ui.theme.*
 import kotlin.math.cos
@@ -88,6 +89,7 @@ fun GameAnimationOverlay(cue: AnimationCue) {
         )
     }
     val measurer = rememberTextMeasurer()
+    val t = LocalTexts.current
     val p = progress.value
     val envelope = fadeEnvelope(p)
 
@@ -114,10 +116,7 @@ fun GameAnimationOverlay(cue: AnimationCue) {
         // Splash-Texte — pro Cue eigener Stil
         when (cue.kind) {
             AnimationCue.Kind.GO_FISH -> {
-                val subtitle = if (cue.drawnCard != null)
-                    "du ziehst eine Karte"
-                else
-                    "Deck ist leer"
+                val subtitle = if (cue.drawnCard != null) t.animDrawCard else t.animDeckEmpty
                 ComicGoFishSplash(
                     subtitle = subtitle,
                     progress = p,
@@ -1203,7 +1202,7 @@ private fun StealSplash(
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                text = "geangelt!",
+                text = LocalTexts.current.animCaught,
                 color = Foam,
                 style = TextStyle(
                     fontSize      = 22.sp,
@@ -1531,7 +1530,7 @@ private fun BookSplash(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         ComicTextBold(
-            text        = "📚  BUCH!",
+            text        = LocalTexts.current.animBook,
             fontSize    = 56.sp,
             fillColor   = SunYellow,
             strokeColor = SuitDark,
@@ -1539,7 +1538,7 @@ private fun BookSplash(
         )
         Spacer(Modifier.height(6.dp))
         Text(
-            text = "${rank}er komplett",
+            text = LocalTexts.current.animBookComplete(rank),
             color = Foam,
             style = TextStyle(
                 fontSize      = 22.sp,
