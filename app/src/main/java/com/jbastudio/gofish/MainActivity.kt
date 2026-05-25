@@ -9,6 +9,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -22,8 +23,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -34,6 +38,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.jbastudio.gofish.i18n.Language
+import com.jbastudio.gofish.i18n.LocalTexts
+import com.jbastudio.gofish.i18n.Texts
+import com.jbastudio.gofish.i18n.textsFor
 import com.jbastudio.gofish.network.GameClient
 import com.jbastudio.gofish.network.GameServer
 import com.jbastudio.gofish.network.OnlineGameClient
@@ -62,6 +70,7 @@ class MainActivity : ComponentActivity() {
         val myIp = localIpAddress()
         val avatarPrefs = AvatarPrefs(this)
         val netPrefs    = NetPrefs(this)
+        val langPrefs   = LanguagePrefs(this)
         // Initialer Avatar aus Prefs in den Holder spielen
         GameHolder.myAvatar = avatarPrefs.load()
 
@@ -79,16 +88,19 @@ class MainActivity : ComponentActivity() {
                 // Optionaler, vom Nutzer gesetzter Server (z. B. zum Testen). Leer = Standard.
                 var serverOverride by remember { mutableStateOf(netPrefs.loadRelayUrl()) }
                 var showServerDlg  by remember { mutableStateOf(false) }
+                // Aktuelle Sprache (live umschaltbar über die Flaggen im Hauptmenü)
+                var lang by remember { mutableStateOf(langPrefs.load()) }
+                val T: Texts = textsFor(lang)
                 // Token-Container: jeder Connect-Versuch bekommt eine eigene ID;
                 // wird sie inkrementiert, sind alle laufenden Callbacks "stale" und werden ignoriert.
                 val attempt = remember { intArrayOf(0) }
 
                 val cancel: () -> Unit = {
                     val cancelMsg = when (mode) {
-                        Mode.HOST   -> "Hosting abgebrochen."
-                        Mode.JOIN   -> "Suche abgebrochen."
-                        Mode.ONLINE -> "Suche abgebrochen."
-                        else        -> "Vorgang abgebrochen."
+                        Mode.HOST   -> T.hostingCancelled
+                        Mode.JOIN   -> T.searchCancelled
+                        Mode.ONLINE -> T.searchCancelled
+                        else        -> T.operationCancelled
                     }
                     attempt[0]++                       // invalidiert offene Callbacks
                     GameHolder.client?.apply {
@@ -137,18 +149,19 @@ class MainActivity : ComponentActivity() {
                         // Noch kein Server hinterlegt → Hinweis statt Suche
                         busy    = false
                         mode    = null
-                        status  = "Online-Server ist noch nicht eingerichtet."
+                        status  = T.serverNotSetUp
                         isError = true
                     } else {
-                        val finalName = name.trim().ifEmpty { "Spieler" }
+                        val finalName = name.trim().ifEmpty { T.defaultNamePlayer }
                         val myToken = ++attempt[0]
                         busy   = true
                         mode   = Mode.ONLINE
-                        status = "Suche nach Gegner …"
+                        status = T.searchingOpponent
                         findOnlineMatch(
                             relayUrl = url,
                             name     = finalName,
                             token    = myToken,
+                            texts    = T,
                             onUpdate = { s, err ->
                                 if (attempt[0] == myToken) runOnUiThread {
                                     status  = s
@@ -162,6 +175,8 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                 }
+
+                CompositionLocalProvider(LocalTexts provides T) {
 
                 if (showAvatarDlg) {
                     AvatarSelectionDialog(
@@ -200,7 +215,9 @@ class MainActivity : ComponentActivity() {
                       avatar        = avatarChoice,
                       onAvatarClick = { showAvatarDlg = true },
                       onFindGame    = startMatchmaking,
-                      onLocalHost   = { goTo(Screen.LOCAL) }
+                      onLocalHost   = { goTo(Screen.LOCAL) },
+                      language      = lang,
+                      onLanguageChange = { lang = it; langPrefs.save(it) }
                   )
 
                   Screen.ONLINE -> OnlineScreen(
@@ -229,22 +246,21 @@ class MainActivity : ComponentActivity() {
                     onBack         = backToMenu,
                     onCancel       = cancel,
                     onHost = {
-                        val finalName = name.trim().ifEmpty { "Host" }
+                        val finalName = name.trim().ifEmpty { T.defaultNameHost }
                         val myToken = ++attempt[0]
                         busy    = true
                         isError = false
                         mode    = Mode.HOST
-                        status  = "Server wird gestartet …"
+                        status  = T.startingServer
+                        // Server-Logs nur ins Logcat (nicht in die lokalisierte Status-Anzeige)
                         val server = GameServer().also { GameHolder.server = it }
-                        server.onLog = { msg ->
-                            if (attempt[0] == myToken) runOnUiThread { status = msg }
-                        }
                         server.start()
                         connectAsClient(
                             host        = "127.0.0.1",
                             name        = finalName,
                             token       = myToken,
                             currentMode = Mode.HOST,
+                            texts       = T,
                             onUpdate = { s, err ->
                                 if (attempt[0] == myToken) runOnUiThread {
                                     status  = s
@@ -260,22 +276,23 @@ class MainActivity : ComponentActivity() {
                         )
                     },
                     onJoin = {
-                        val finalName = name.trim().ifEmpty { "Gast" }
+                        val finalName = name.trim().ifEmpty { T.defaultNameGuest }
                         val ip = hostIp.trim()
                         if (ip.isEmpty()) {
-                            status = "Bitte Host-IP eingeben"
+                            status = T.enterHostIp
                             isError = true
                         } else {
                             val myToken = ++attempt[0]
                             busy    = true
                             isError = false
                             mode    = Mode.JOIN
-                            status  = "Verbinde mit $ip …"
+                            status  = T.connectingTo(ip)
                             connectAsClient(
                                 host        = ip,
                                 name        = finalName,
                                 token       = myToken,
                                 currentMode = Mode.JOIN,
+                                texts       = T,
                                 onUpdate = { s, err ->
                                     if (attempt[0] == myToken) runOnUiThread {
                                         status  = s
@@ -293,6 +310,7 @@ class MainActivity : ComponentActivity() {
                     }
                   )
                 } // when (screen)
+                } // CompositionLocalProvider
             }
         }
     }
@@ -302,12 +320,13 @@ class MainActivity : ComponentActivity() {
         name: String,
         token: Int,
         currentMode: Mode,
+        texts: Texts,
         onUpdate: (String, Boolean) -> Unit,
         onSessionStart: () -> Unit
     ) {
         val client = GameClient(host, name, GameHolder.myAvatar).also { GameHolder.client = it }
-        client.onConnected = { onUpdate("Verbunden! Warte auf Spielstart …", false) }
-        client.onError     = { err -> onUpdate(friendlyError(err, currentMode), true) }
+        client.onConnected = { onUpdate(texts.connectedWaiting, false) }
+        client.onError     = { err -> onUpdate(friendlyError(err, currentMode, texts), true) }
         client.onMessage   = { msg ->
             if (msg.getString("type") == "GAME_START") {
                 GameHolder.gameStartMsg = msg
@@ -331,13 +350,14 @@ class MainActivity : ComponentActivity() {
         relayUrl: String,
         name: String,
         token: Int,
+        texts: Texts,
         onUpdate: (String, Boolean) -> Unit,
         onSessionStart: () -> Unit
     ) {
         val client = OnlineGameClient(relayUrl, name, GameHolder.myAvatar)
             .also { GameHolder.client = it }
-        client.onConnected = { onUpdate("Gegner gefunden! Spiel startet …", false) }
-        client.onError     = { err -> onUpdate(friendlyError(err, Mode.ONLINE), true) }
+        client.onConnected = { onUpdate(texts.opponentFound, false) }
+        client.onError     = { err -> onUpdate(friendlyError(err, Mode.ONLINE, texts), true) }
         client.onMessage   = { msg ->
             if (msg.getString("type") == "GAME_START") {
                 GameHolder.gameStartMsg = msg
@@ -350,8 +370,8 @@ class MainActivity : ComponentActivity() {
         client.connect()
     }
 
-    /** Übersetzt rohe Socket-/IO-Meldungen in spielerfreundliches Deutsch. */
-    private fun friendlyError(raw: String, mode: Mode): String {
+    /** Übersetzt rohe Socket-/IO-Meldungen in spielerfreundliche, lokalisierte Texte. */
+    private fun friendlyError(raw: String, mode: Mode, t: Texts): String {
         val r = raw.lowercase()
         return when {
             r.contains("socket closed")
@@ -360,25 +380,25 @@ class MainActivity : ComponentActivity() {
                     || r.contains("connection reset")
                     || r.contains("eof") ->
                 when (mode) {
-                    Mode.HOST   -> "Hosting beendet."
-                    Mode.JOIN   -> "Verbindung wurde getrennt."
-                    Mode.ONLINE -> "Verbindung zum Server getrennt."
+                    Mode.HOST   -> t.errHostingEnded
+                    Mode.JOIN   -> t.errConnectionLost
+                    Mode.ONLINE -> t.errServerConnLost
                 }
             r.contains("unable to resolve host") || r.contains("nodename nor servname")
                     || r.contains("ungültige server-url") ->
-                "Server-Adresse ungültig oder nicht erreichbar."
+                t.errInvalidServer
             r.contains("connection refused") || r.contains("econnrefused") ->
-                if (mode == Mode.ONLINE) "Server nicht erreichbar — läuft der Relay-Server?"
-                else "Server nicht erreichbar — IP korrekt eingegeben?"
+                if (mode == Mode.ONLINE) t.errServerUnreachableRelay
+                else t.errServerUnreachableIp
             r.contains("timeout") || r.contains("etimedout") ->
-                "Zeitüberschreitung — Server antwortet nicht."
+                t.errTimeout
             r.contains("network is unreachable") || r.contains("enetunreach") ->
-                "Kein Netzwerk verfügbar."
+                t.errNoNetwork
             r.contains("no route to host") || r.contains("ehostunreach") ->
-                "Server unter dieser IP nicht erreichbar."
+                t.errNoRoute
             r.contains("permission denied") ->
-                "Zugriff verweigert. Hat die App Netzwerk-Rechte?"
-            else -> "Fehler: $raw"
+                t.errPermission
+            else -> t.errGeneric(raw)
         }
     }
 
@@ -433,7 +453,7 @@ class MainActivity : ComponentActivity() {
                 ?.let { return it }
         } catch (_: Exception) { /* ignorieren */ }
 
-        return "Unbekannt"
+        return ""   // unbekannt → wird bei der Anzeige lokalisiert
     }
 }
 
@@ -448,8 +468,11 @@ private fun MainMenuScreen(
     avatar: AvatarChoice,
     onAvatarClick: () -> Unit,
     onFindGame: () -> Unit,
-    onLocalHost: () -> Unit
+    onLocalHost: () -> Unit,
+    language: Language,
+    onLanguageChange: (Language) -> Unit
 ) {
+    val t = LocalTexts.current
     OceanBackground {
         Column(
             modifier = Modifier
@@ -468,7 +491,7 @@ private fun MainMenuScreen(
                 textAlign = TextAlign.Center
             )
             Text(
-                text = "Schnapp dir den Fang!",
+                text = t.tagline,
                 style = MaterialTheme.typography.titleMedium,
                 color = SoftSeaText
             )
@@ -514,7 +537,7 @@ private fun MainMenuScreen(
 
             // Zwei Wege ins Spiel
             PastelButton(
-                text      = "Finde ein Spiel!",
+                text      = t.findGame,
                 emoji     = "🌐",
                 enabled   = true,
                 container = SeafoamGreen,
@@ -522,14 +545,60 @@ private fun MainMenuScreen(
             )
             Spacer(Modifier.height(14.dp))
             PastelButton(
-                text      = "Lokal hosten",
+                text      = t.hostLocal,
                 emoji     = "🏠",
                 enabled   = true,
                 container = Lavender,
                 onClick   = onLocalHost
             )
         }
+
+        // Sprachauswahl unten rechts
+        LanguageSelector(
+            current = language,
+            onSelect = onLanguageChange,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .systemBarsPadding()
+                .padding(16.dp)
+        )
     }
+}
+
+/** Flaggen-Sprachauswahl (Deutsch / Spanisch). */
+@Composable
+private fun LanguageSelector(
+    current: Language,
+    onSelect: (Language) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        FlagButton(R.drawable.flag_de, selected = current == Language.DE) { onSelect(Language.DE) }
+        FlagButton(R.drawable.flag_es, selected = current == Language.ES) { onSelect(Language.ES) }
+    }
+}
+
+@Composable
+private fun FlagButton(flagRes: Int, selected: Boolean, onClick: () -> Unit) {
+    Image(
+        painter = painterResource(flagRes),
+        contentDescription = null,
+        contentScale = ContentScale.FillBounds,
+        modifier = Modifier
+            .size(width = 44.dp, height = 30.dp)
+            .clip(RoundedCornerShape(7.dp))
+            .border(
+                width = if (selected) 3.dp else 1.dp,
+                color = if (selected) DeepSea else DeepSea.copy(alpha = 0.30f),
+                shape = RoundedCornerShape(7.dp)
+            )
+            .alpha(if (selected) 1f else 0.55f)
+            .clickable { onClick() }
+    )
 }
 
 // ═════════════════════════════════════════════════════════════════════════
@@ -545,7 +614,7 @@ private fun MainMenuScreen(
  *
  * Leer = noch nicht eingerichtet (App zeigt dann einen Hinweis).
  */
-private const val DEFAULT_RELAY_URL = ""
+private const val DEFAULT_RELAY_URL = "wss://gofish-relay.onrender.com/ws"
 
 @Composable
 private fun OnlineScreen(
@@ -558,6 +627,7 @@ private fun OnlineScreen(
     onRetry: () -> Unit,
     onEditServer: () -> Unit
 ) {
+    val t = LocalTexts.current
     OceanBackground {
         Column(
             modifier = Modifier
@@ -567,10 +637,10 @@ private fun OnlineScreen(
                 .padding(horizontal = 20.dp, vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            BackRow(text = "Hauptmenü", enabled = !busy, onBack = onBack)
+            BackRow(text = t.mainMenu, enabled = !busy, onBack = onBack)
 
             Text(
-                text  = "Spiel finden",
+                text  = t.findGameTitle,
                 style = MaterialTheme.typography.displayLarge.copy(
                     fontSize = 42.sp, fontWeight = FontWeight.Black
                 ),
@@ -578,7 +648,7 @@ private fun OnlineScreen(
                 textAlign = TextAlign.Center
             )
             Text(
-                text = "Automatisch mit einem Gegner verbinden",
+                text = t.onlineSubtitle,
                 style = MaterialTheme.typography.titleMedium,
                 color = SoftSeaText,
                 textAlign = TextAlign.Center
@@ -606,14 +676,14 @@ private fun OnlineScreen(
                             )
                             Spacer(Modifier.height(10.dp))
                             Text(
-                                text = status.ifEmpty { "Suche nach Gegner …" },
+                                text = status.ifEmpty { t.searchingOpponent },
                                 modifier = Modifier.fillMaxWidth(),
                                 textAlign = TextAlign.Center,
                                 color = DeepSea,
                                 style = MaterialTheme.typography.titleLarge
                             )
                             Text(
-                                "Warte auf einen anderen Spieler, der gerade sucht.",
+                                t.waitingForPlayer,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(top = 4.dp),
@@ -623,7 +693,7 @@ private fun OnlineScreen(
                             )
                             Spacer(Modifier.height(16.dp))
                             PastelButton(
-                                text = "Suche abbrechen",
+                                text = t.cancelSearch,
                                 emoji = "✋",
                                 enabled = true,
                                 container = CoralDeep,
@@ -645,14 +715,13 @@ private fun OnlineScreen(
                                 .padding(18.dp)
                         ) {
                             Text(
-                                "Online-Server noch nicht eingerichtet",
+                                t.serverNotConfiguredTitle,
                                 style = MaterialTheme.typography.titleLarge,
                                 color = DeepSea
                             )
                             Spacer(Modifier.height(6.dp))
                             Text(
-                                "Damit sich Spieler über das Internet automatisch finden, " +
-                                    "muss einmalig ein Relay-Server laufen. Trag seine Adresse hier ein.",
+                                t.serverNotConfiguredBody,
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = DeepSea
                             )
@@ -660,7 +729,7 @@ private fun OnlineScreen(
                     }
                     Spacer(Modifier.height(16.dp))
                     PastelButton(
-                        text = "Server festlegen",
+                        text = t.setServer,
                         emoji = "🛰️",
                         enabled = true,
                         container = SeafoamGreen,
@@ -671,7 +740,7 @@ private fun OnlineScreen(
                 else -> {
                     // Bereit (z. B. nach Abbruch / Fehler / Spielende) → erneut suchen
                     PastelButton(
-                        text = "Spiel finden",
+                        text = t.findGameTitle,
                         emoji = "🔎",
                         enabled = true,
                         container = SeafoamGreen,
@@ -698,7 +767,7 @@ private fun OnlineScreen(
                     Spacer(Modifier.height(18.dp))
                     // Dezente Option (Tests / eigener Server)
                     TextButton(onClick = onEditServer) {
-                        Text("Server ändern", color = SoftSeaText)
+                        Text(t.changeServer, color = SoftSeaText)
                     }
                 }
             }
@@ -715,6 +784,7 @@ private fun ServerDialog(
     onUseDefault: () -> Unit,
     onClose: () -> Unit
 ) {
+    val t = LocalTexts.current
     var text by remember { mutableStateOf(current) }
     Dialog(
         onDismissRequest = onClose,
@@ -733,11 +803,10 @@ private fun ServerDialog(
                     .padding(horizontal = 20.dp, vertical = 22.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text("Server-Adresse", style = MaterialTheme.typography.headlineLarge, color = DeepSea)
+                Text(t.serverAddressTitle, style = MaterialTheme.typography.headlineLarge, color = DeepSea)
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    "Nur zum Testen oder für einen eigenen Server nötig. " +
-                        "Leer lassen = Standard-Server der App.",
+                    t.serverDialogBody,
                     style = MaterialTheme.typography.bodyMedium,
                     color = SoftSeaText,
                     textAlign = TextAlign.Center
@@ -751,14 +820,14 @@ private fun ServerDialog(
                 if (defaultUrl.isNotBlank()) {
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "Standard: $defaultUrl",
+                        t.defaultServerLabel(defaultUrl),
                         style = MaterialTheme.typography.bodySmall,
                         color = SoftSeaText
                     )
                 }
                 Spacer(Modifier.height(20.dp))
                 PastelButton(
-                    text = "Übernehmen",
+                    text = t.applyBtn,
                     emoji = "✓",
                     enabled = text.isNotBlank(),
                     container = SeafoamGreen,
@@ -766,7 +835,7 @@ private fun ServerDialog(
                 )
                 Spacer(Modifier.height(8.dp))
                 TextButton(onClick = onUseDefault) {
-                    Text("Standard verwenden", color = SoftSeaText)
+                    Text(t.useDefaultBtn, color = SoftSeaText)
                 }
             }
         }
@@ -786,14 +855,15 @@ private fun PlayerCard(
     onAvatarClick: () -> Unit,
     enabled: Boolean
 ) {
+    val t = LocalTexts.current
     BubblePanel(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(18.dp)) {
-            SectionLabel("Dein Name")
+            SectionLabel(t.yourName)
             Spacer(Modifier.height(6.dp))
             PastelTextField(
                 value = name,
                 onChange = onNameChange,
-                placeholder = "z. B. Käpt'n Nemo",
+                placeholder = t.namePlaceholder,
                 capWords = true,
                 enabled = enabled
             )
@@ -854,6 +924,7 @@ private fun LobbyScreen(
     onHost: () -> Unit,
     onJoin: () -> Unit
 ) {
+    val t = LocalTexts.current
     OceanBackground {
         Column(
             modifier = Modifier
@@ -864,11 +935,11 @@ private fun LobbyScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Zurück ins Hauptmenü
-            BackRow(text = "Hauptmenü", enabled = !busy, onBack = onBack)
+            BackRow(text = t.mainMenu, enabled = !busy, onBack = onBack)
 
             // Titel
             Text(
-                text  = "Lokal spielen",
+                text  = t.localTitle,
                 style = MaterialTheme.typography.displayLarge.copy(
                     fontSize = 42.sp, fontWeight = FontWeight.Black
                 ),
@@ -876,7 +947,7 @@ private fun LobbyScreen(
                 textAlign = TextAlign.Center
             )
             Text(
-                text = "Hosten oder im selben WLAN beitreten",
+                text = t.localSubtitle,
                 style = MaterialTheme.typography.titleMedium,
                 color = SoftSeaText,
                 textAlign = TextAlign.Center
@@ -925,19 +996,19 @@ private fun LobbyScreen(
             BubblePanel(modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(18.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        SectionLabel("Spiel hosten")
+                        SectionLabel(t.hostGame)
                         Spacer(Modifier.weight(1f))
                         Text("🏠", fontSize = 22.sp)
                     }
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        "Deine IP: $myIp",
+                        t.yourIp(myIp.ifBlank { t.unknownIp }),
                         style = MaterialTheme.typography.bodyMedium,
                         color = SoftSeaText
                     )
                     Spacer(Modifier.height(12.dp))
                     PastelButton(
-                        text = "Server starten",
+                        text = t.startServer,
                         emoji = "🎣",
                         enabled = !busy,
                         container = SeafoamGreen,
@@ -952,7 +1023,7 @@ private fun LobbyScreen(
             BubblePanel(modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(18.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        SectionLabel("Spiel beitreten")
+                        SectionLabel(t.joinGame)
                         Spacer(Modifier.weight(1f))
                         Text("🌊", fontSize = 22.sp)
                     }
@@ -960,12 +1031,12 @@ private fun LobbyScreen(
                     PastelTextField(
                         value = hostIp,
                         onChange = onHostIpChange,
-                        placeholder = "Host-IP (z. B. 192.168.0.42)",
+                        placeholder = t.hostIpPlaceholder,
                         enabled = !busy
                     )
                     Spacer(Modifier.height(12.dp))
                     PastelButton(
-                        text = "Beitreten",
+                        text = t.joinBtn,
                         emoji = "🐟",
                         enabled = !busy,
                         container = CoralPink,
@@ -999,7 +1070,7 @@ private fun LobbyScreen(
                         if (busy && mode == MainActivity.Mode.JOIN) {
                             Spacer(Modifier.height(12.dp))
                             PastelButton(
-                                text = "Verbindung abbrechen",
+                                text = t.cancelConnection,
                                 emoji = "✋",
                                 enabled = true,
                                 container = CoralDeep,
@@ -1108,6 +1179,7 @@ private fun HostingDialog(
     status: String,
     onCancel: () -> Unit
 ) {
+    val t = LocalTexts.current
     Dialog(
         onDismissRequest = { /* explizit Abbrechen — kein Dismiss durch Außenklick */ },
         properties = DialogProperties(
@@ -1136,13 +1208,13 @@ private fun HostingDialog(
                 )
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    "Spiel hosten",
+                    t.hostingDialogTitle,
                     style = MaterialTheme.typography.headlineLarge,
                     color = DeepSea
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Gib diese IP an deinen Mitspieler weiter:",
+                    t.shareIp,
                     style = MaterialTheme.typography.bodyMedium,
                     color = SoftSeaText,
                     textAlign = TextAlign.Center
@@ -1159,7 +1231,7 @@ private fun HostingDialog(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = myIp,
+                        text = myIp.ifBlank { t.unknownIp },
                         style = TextStyle(
                             fontFamily = FontFamily.Monospace,
                             fontSize = 30.sp,
@@ -1173,7 +1245,7 @@ private fun HostingDialog(
 
                 Spacer(Modifier.height(16.dp))
                 Text(
-                    text = status.ifEmpty { "Warte auf Mitspieler …" },
+                    text = status.ifEmpty { t.waitingForCoPlayer },
                     style = MaterialTheme.typography.titleMedium,
                     color = SoftSeaText,
                     textAlign = TextAlign.Center
@@ -1182,7 +1254,7 @@ private fun HostingDialog(
                 Spacer(Modifier.height(22.dp))
 
                 PastelButton(
-                    text     = "Hosting abbrechen",
+                    text     = t.cancelHosting,
                     emoji    = "✋",
                     enabled  = true,
                     container = CoralDeep,
@@ -1203,6 +1275,7 @@ private fun AvatarChooserRow(
     enabled: Boolean,
     onClick: () -> Unit
 ) {
+    val t = LocalTexts.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1221,12 +1294,12 @@ private fun AvatarChooserRow(
         Spacer(Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                "Dein Avatar",
+                t.yourAvatar,
                 style = MaterialTheme.typography.titleMedium,
                 color = DeepSea
             )
             Text(
-                "${avatar.kind.displayName} · ${avatar.color.displayName}",
+                t.avatarSummary(t.kindName(avatar.kind), t.colorName(avatar.color)),
                 style = MaterialTheme.typography.bodyMedium,
                 color = SoftSeaText
             )
@@ -1241,6 +1314,7 @@ private fun AvatarSelectionDialog(
     onChoiceChange: (AvatarChoice) -> Unit,
     onClose: () -> Unit
 ) {
+    val t = LocalTexts.current
     Dialog(
         onDismissRequest = onClose,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -1258,10 +1332,10 @@ private fun AvatarSelectionDialog(
                     .padding(horizontal = 20.dp, vertical = 22.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text("Avatar wählen", style = MaterialTheme.typography.headlineLarge, color = DeepSea)
+                Text(t.chooseAvatarTitle, style = MaterialTheme.typography.headlineLarge, color = DeepSea)
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    "Such dir ein Meeresbewohner aus.",
+                    t.chooseAvatarSubtitle,
                     style = MaterialTheme.typography.bodyMedium,
                     color = SoftSeaText
                 )
@@ -1289,7 +1363,7 @@ private fun AvatarSelectionDialog(
                 }
 
                 Spacer(Modifier.height(20.dp))
-                Text("Farbe", style = MaterialTheme.typography.titleLarge, color = DeepSea)
+                Text(t.colorLabel, style = MaterialTheme.typography.titleLarge, color = DeepSea)
                 Spacer(Modifier.height(10.dp))
 
                 Row(
@@ -1308,7 +1382,7 @@ private fun AvatarSelectionDialog(
                 Spacer(Modifier.height(22.dp))
 
                 PastelButton(
-                    text      = "Fertig",
+                    text      = t.doneBtn,
                     emoji     = "✓",
                     enabled   = true,
                     container = SeafoamGreen,
@@ -1327,6 +1401,7 @@ private fun AvatarTile(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val t = LocalTexts.current
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
@@ -1351,7 +1426,7 @@ private fun AvatarTile(
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            text  = kind.displayName,
+            text  = t.kindName(kind),
             color = DeepSea,
             style = MaterialTheme.typography.labelMedium
         )

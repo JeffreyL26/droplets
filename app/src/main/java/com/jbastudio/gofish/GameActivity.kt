@@ -40,6 +40,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.jbastudio.gofish.i18n.LocalTexts
+import com.jbastudio.gofish.i18n.Texts
+import com.jbastudio.gofish.i18n.textsFor
 import com.jbastudio.gofish.model.Card
 import com.jbastudio.gofish.ui.components.ANIMATION_DURATION_MS
 import com.jbastudio.gofish.ui.components.AnimationCue
@@ -56,9 +59,15 @@ import com.jbastudio.gofish.ui.theme.*
 import kotlinx.coroutines.delay
 import org.json.JSONObject
 
+/** Sprachneutraler Sieger-Wert vom Server für ein Unentschieden (siehe GameAuthority). */
+private const val TIE_SENTINEL = "Unentschieden!"
+
 class GameActivity : ComponentActivity() {
 
     private val state = GameUiState()
+
+    /** Sprache der laufenden Partie (bei Spielstart festgelegt). */
+    private lateinit var T: Texts
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -66,8 +75,12 @@ class GameActivity : ComponentActivity() {
 
         val client = GameHolder.client ?: run { finish(); return }
 
+        // Sprache laden (während einer Partie unveränderlich)
+        T = textsFor(LanguagePrefs(this).load())
+
         // Eigener Avatar aus dem persistenten Holder
         state.myAvatar = GameHolder.myAvatar
+        state.opponentName = T.opponentDefault
 
         // gecachte GAME_START verarbeiten
         GameHolder.gameStartMsg?.let { handleMessage(it) }
@@ -76,31 +89,32 @@ class GameActivity : ComponentActivity() {
         client.onError   = { err -> runOnUiThread {
             // Während des Spiels = Netzwerkabbruch → Sitzung beenden
             if (state.sessionEndedMessage == null) {
-                state.sessionEndedMessage =
-                    "Verbindung zum Mitspieler verloren.\nDie Sitzung wird beendet."
+                state.sessionEndedMessage = T.connectionLostSession
             }
         }}
 
         setContent {
             GoFishTheme {
-                GameScreen(
-                    state  = state,
-                    onExit = { finish() },
-                    onAsk  = { rank ->
-                        if (!state.myTurn) return@GameScreen
-                        when {
-                            rank !in Card.RANKS ->
-                                toast("Diese Karte gibt es nicht.")
-                            state.myHand.none { it.rank == rank } ->
-                                toast("Du musst mindestens eine $rank-Karte halten!")
-                            else -> {
-                                GameHolder.client?.sendAsk(rank)
-                                state.selectedRank = null
-                                state.myTurn = false  // gesperrt bis Antwort kommt
+                CompositionLocalProvider(LocalTexts provides T) {
+                    GameScreen(
+                        state  = state,
+                        onExit = { finish() },
+                        onAsk  = { rank ->
+                            if (!state.myTurn) return@GameScreen
+                            when {
+                                rank !in Card.RANKS ->
+                                    toast(T.toastNoSuchCard)
+                                state.myHand.none { it.rank == rank } ->
+                                    toast(T.toastMustHold(rank))
+                                else -> {
+                                    GameHolder.client?.sendAsk(rank)
+                                    state.selectedRank = null
+                                    state.myTurn = false  // gesperrt bis Antwort kommt
+                                }
                             }
                         }
-                    }
-                )
+                    )
+                }
             }
         }
     }
@@ -110,8 +124,7 @@ class GameActivity : ComponentActivity() {
             "GAME_START"    -> handleGameStart(msg)
             "ASK_RESULT"    -> handleAskResult(msg)
             "OPPONENT_LEFT" -> {
-                state.sessionEndedMessage =
-                    "${state.opponentName} hat das Spiel verlassen.\nDie Sitzung wird beendet."
+                state.sessionEndedMessage = T.opponentLeft(state.opponentName)
             }
         }
     }
@@ -131,7 +144,7 @@ class GameActivity : ComponentActivity() {
         state.myBooks          = emptyList()
         state.gameOver         = false
         state.winnerName       = ""
-        state.appendSystem("🎬 Spiel gestartet — du spielst als ${GameHolder.client?.playerName}")
+        state.appendSystem(T.gameStartedAs(GameHolder.client?.playerName.orEmpty()))
     }
 
     private fun parseAvatar(kindStr: String, colorStr: String): AvatarChoice {
@@ -167,11 +180,11 @@ class GameActivity : ComponentActivity() {
                     rank  = rank,
                     cards = cards
                 ))
-                state.appendAction(isMe = true, name = "Du",
-                    text = "fragtest nach $rank → ${state.opponentName} gibt dir ${cards.size} Karte(n) — nochmal dran.")
+                state.appendAction(isMe = true, name = T.you,
+                    text = T.youAskedGot(state.opponentName, rank, cards.size))
             } else {
-                state.appendAction(isMe = true, name = "Du",
-                    text = "fragtest nach $rank → Go Fish!")
+                state.appendAction(isMe = true, name = T.you,
+                    text = T.youAskedGoFish(rank))
                 val drawn: Card? =
                     if (msg.has("drawnCard")) Card.fromJson(msg.getJSONObject("drawnCard")) else null
                 cueSequence.add(AnimationCue(
@@ -181,9 +194,9 @@ class GameActivity : ComponentActivity() {
                 ))
                 if (drawn != null) {
                     val matched = msg.getBoolean("drawnMatched")
-                    state.appendSystem("   ↳ Gezogen: $drawn${if (matched) "  ✓ Treffer — nochmal dran." else ""}")
+                    state.appendSystem(if (matched) T.drawnCardHit(drawn.toString()) else T.drawnCard(drawn.toString()))
                 } else {
-                    state.appendSystem("   ↳ Deck ist leer.")
+                    state.appendSystem(T.deckEmpty)
                 }
             }
             // BOOK-Celebrations folgen direkt im Anschluss (eigene Cues in der Queue)
@@ -194,17 +207,17 @@ class GameActivity : ComponentActivity() {
             if (gotCards) {
                 val n = msg.getInt("cardCount")
                 state.appendAction(isMe = false, name = state.opponentName,
-                    text = "fragte nach $rank → nimmt $n Karte(n) von dir.")
+                    text = T.oppAskedGot(rank, n))
             } else {
                 state.appendAction(isMe = false, name = state.opponentName,
-                    text = "fragte nach $rank → Go Fish!${if (wentFish) " Zieht eine Karte." else ""}")
+                    text = T.oppAskedGoFish(rank, wentFish))
             }
         }
         for (b in newBooks) {
             state.appendBook(
                 isMe = askerIsYou,
-                name = if (askerIsYou) "Du" else state.opponentName,
-                text = if (askerIsYou) "hast ein ${b}er-Buch abgelegt!" else "hat ein ${b}er-Buch abgelegt!"
+                name = if (askerIsYou) T.you else state.opponentName,
+                text = if (askerIsYou) T.youBook(b) else T.oppBook(b)
             )
         }
 
@@ -215,14 +228,14 @@ class GameActivity : ComponentActivity() {
             val opBks  = msg.getInt("opBooks")
             val myName = GameHolder.client?.playerName.orEmpty()
             state.gameResult = when {
-                state.winnerName.equals("Unentschieden!", ignoreCase = true) ->
+                state.winnerName.equals(TIE_SENTINEL, ignoreCase = true) ->
                     GameResult.Tie(myBks, opBks)
                 state.winnerName == myName ->
                     GameResult.Win(myBks, opBks)
                 else ->
                     GameResult.Lose(state.winnerName, myBks, opBks)
             }
-            state.appendSystem("🏁 Spiel beendet.")
+            state.appendSystem(T.gameOverLog)
         }
 
         // Animations-Sequenz starten (falls eigene Aktion → STEAL/GO_FISH + ggf. BOOKs)
@@ -433,7 +446,7 @@ private fun GameScreen(state: GameUiState, onExit: () -> Unit, onAsk: (String) -
                 ) {
                     DeckBadge(deckSize = state.deckSize, modifier = Modifier.weight(1f))
                     BooksBadge(
-                        title = "Deine Bücher",
+                        title = LocalTexts.current.yourBooks,
                         books = state.myBooks,
                         color = SeafoamGreen,
                         modifier = Modifier.weight(2f)
@@ -521,7 +534,7 @@ private fun OpponentPanel(name: String, avatar: AvatarChoice, handSize: Int, boo
                     color = Foam
                 )
                 Text(
-                    "🃏 $handSize Karten   📚 ${books.size} Bücher",
+                    LocalTexts.current.handAndBooks(handSize, books.size),
                     style = MaterialTheme.typography.bodyMedium,
                     color = Foam.copy(alpha = 0.92f)
                 )
@@ -543,7 +556,7 @@ private fun DeckBadge(deckSize: Int, modifier: Modifier = Modifier) {
                 .padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("🎴 Deck", style = MaterialTheme.typography.titleMedium, color = Foam)
+            Text(LocalTexts.current.deckBadge, style = MaterialTheme.typography.titleMedium, color = Foam)
             Text(
                 "$deckSize",
                 style = MaterialTheme.typography.displayMedium.copy(fontSize = 28.sp),
@@ -632,7 +645,7 @@ private fun LogPanel(
         ) {
             if (entries.isEmpty()) {
                 Text(
-                    "🌊 Noch nichts passiert …",
+                    LocalTexts.current.logEmpty,
                     color = SoftSeaText,
                     fontSize = 12.sp
                 )
@@ -714,10 +727,12 @@ private fun TurnStatusBar(
     winnerName: String,
     opponentName: String
 ) {
+    val t = LocalTexts.current
+    val winnerDisplay = if (winnerName.equals(TIE_SENTINEL, ignoreCase = true)) t.drawWord else winnerName
     val (bg, fg, text) = when {
-        gameOver -> Triple(SunYellow, DeepSea, "🏆 Spiel vorbei — $winnerName gewinnt!")
-        myTurn   -> Triple(SeafoamGreen, DeepSea, "⬆️  Du bist dran — wähle deine Karte aus!")
-        else     -> Triple(Lavender, DeepSea, "⏳  Warte auf $opponentName …")
+        gameOver -> Triple(SunYellow, DeepSea, t.turnGameOver(winnerDisplay))
+        myTurn   -> Triple(SeafoamGreen, DeepSea, t.turnYou)
+        else     -> Triple(Lavender, DeepSea, t.turnWaiting(opponentName))
     }
     BubblePanel(
         modifier = Modifier.fillMaxWidth(),
@@ -752,14 +767,14 @@ private fun HandGrid(
         Column(Modifier.padding(vertical = 8.dp, horizontal = 10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "Deine Hand",
+                    LocalTexts.current.yourHand,
                     style = MaterialTheme.typography.titleMedium,
                     color = DeepSea
                 )
                 Spacer(Modifier.weight(1f))
                 if (sorted.size > 12) {
                     Text(
-                        "↕ scrollen",
+                        LocalTexts.current.scrollHint,
                         color = SoftSeaText,
                         fontSize = 11.sp,
                         modifier = Modifier.padding(end = 8.dp)
@@ -775,7 +790,7 @@ private fun HandGrid(
 
             if (sorted.isEmpty()) {
                 Text(
-                    "Keine Karten mehr.",
+                    LocalTexts.current.noCardsLeft,
                     style = MaterialTheme.typography.bodyMedium,
                     color = SoftSeaText,
                     modifier = Modifier.padding(vertical = 24.dp)
@@ -815,7 +830,8 @@ private fun AskButton(
     enabled: Boolean,
     onAsk: () -> Unit
 ) {
-    val label = if (selectedRank != null) "Frage nach $selectedRank" else "Karte wählen"
+    val t = LocalTexts.current
+    val label = if (selectedRank != null) t.askFor(selectedRank) else t.chooseCard
 
     AnimatedVisibility(
         visible = true,
@@ -872,6 +888,7 @@ private fun ExitButton(onClick: () -> Unit) {
 
 @Composable
 private fun ExitConfirmDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    val t = LocalTexts.current
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = RoundedCornerShape(24.dp),
@@ -880,14 +897,14 @@ private fun ExitConfirmDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
         textContentColor  = DeepSea,
         title = {
             Text(
-                "Spiel verlassen?",
+                t.exitTitle,
                 style = MaterialTheme.typography.headlineMedium,
                 color = DeepSea
             )
         },
         text = {
             Text(
-                "Sicher, dass du verlassen möchtest? Die Sitzung wird dadurch beendet.",
+                t.exitBody,
                 style = MaterialTheme.typography.bodyMedium,
                 color = SoftSeaText
             )
@@ -901,7 +918,7 @@ private fun ExitConfirmDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
                     contentColor   = Foam
                 )
             ) {
-                Text("Verlassen", fontWeight = FontWeight.Bold)
+                Text(t.leaveBtn, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
@@ -909,7 +926,7 @@ private fun ExitConfirmDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
                 onClick = onDismiss,
                 colors = ButtonDefaults.textButtonColors(contentColor = DeepSea)
             ) {
-                Text("Bleiben", fontWeight = FontWeight.SemiBold)
+                Text(t.stayBtn, fontWeight = FontWeight.SemiBold)
             }
         }
     )
@@ -917,6 +934,7 @@ private fun ExitConfirmDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
 
 @Composable
 private fun SessionEndedDialog(message: String, onConfirm: () -> Unit) {
+    val t = LocalTexts.current
     AlertDialog(
         onDismissRequest = onConfirm,    // jeder Weg führt zurück zur Lobby
         shape = RoundedCornerShape(24.dp),
@@ -925,7 +943,7 @@ private fun SessionEndedDialog(message: String, onConfirm: () -> Unit) {
         textContentColor  = DeepSea,
         title = {
             Text(
-                "🌊 Sitzung beendet",
+                t.sessionEndedTitle,
                 style = MaterialTheme.typography.headlineMedium,
                 color = DeepSea
             )
@@ -946,7 +964,7 @@ private fun SessionEndedDialog(message: String, onConfirm: () -> Unit) {
                     contentColor   = Foam
                 )
             ) {
-                Text("Zur Lobby", fontWeight = FontWeight.Bold)
+                Text(t.toLobbyBtn, fontWeight = FontWeight.Bold)
             }
         }
     )
@@ -958,7 +976,6 @@ private fun SessionEndedDialog(message: String, onConfirm: () -> Unit) {
 
 private data class ResultStyle(
     val emoji: String,
-    val title: String,
     val accent: Color,
     val accentDeep: Color,
     val panelBg: Color
@@ -966,17 +983,17 @@ private data class ResultStyle(
 
 private fun styleFor(result: GameResult): ResultStyle = when (result) {
     is GameResult.Win -> ResultStyle(
-        emoji = "🏆", title = "Sieg!",
+        emoji = "🏆",
         accent = SunYellow, accentDeep = SunDeep,
         panelBg = SunYellow.copy(alpha = 0.30f)
     )
     is GameResult.Lose -> ResultStyle(
-        emoji = "🪝", title = "Verloren",
+        emoji = "🪝",
         accent = Lavender, accentDeep = LavenderDeep,
         panelBg = Lavender.copy(alpha = 0.35f)
     )
     is GameResult.Tie -> ResultStyle(
-        emoji = "🤝", title = "Unentschieden",
+        emoji = "🤝",
         accent = SeafoamGreen, accentDeep = SeafoamDeep,
         panelBg = SeafoamGreen.copy(alpha = 0.30f)
     )
@@ -990,6 +1007,12 @@ private fun GameOverDialog(
     onDismiss: () -> Unit
 ) {
     val style = styleFor(result)
+    val t = LocalTexts.current
+    val title = when (result) {
+        is GameResult.Win  -> t.winTitle
+        is GameResult.Lose -> t.loseTitle
+        is GameResult.Tie  -> t.tieTitle
+    }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -1028,7 +1051,7 @@ private fun GameOverDialog(
 
                 // Comic-Style Titel
                 GameOverTitle(
-                    text       = style.title,
+                    text       = title,
                     fillColor  = style.accent,
                     strokeColor = DeepSea
                 )
@@ -1038,21 +1061,21 @@ private fun GameOverDialog(
                 // Subtitle (nur bei Niederlage zeigt den Sieger-Namen)
                 if (result is GameResult.Lose) {
                     Text(
-                        text  = "${result.winnerName} hat das Spiel gewonnen.",
+                        text  = t.loseSubtitle(result.winnerName),
                         style = MaterialTheme.typography.bodyMedium,
                         color = SoftSeaText,
                         textAlign = TextAlign.Center
                     )
                 } else if (result is GameResult.Win) {
                     Text(
-                        text  = "Du hast die meisten Bücher gesammelt!",
+                        text  = t.winSubtitle,
                         style = MaterialTheme.typography.bodyMedium,
                         color = SoftSeaText,
                         textAlign = TextAlign.Center
                     )
                 } else {
                     Text(
-                        text  = "Gleichstand — beide haben gleich viele Bücher.",
+                        text  = t.tieSubtitle,
                         style = MaterialTheme.typography.bodyMedium,
                         color = SoftSeaText,
                         textAlign = TextAlign.Center
@@ -1074,9 +1097,9 @@ private fun GameOverDialog(
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        ScoreCell(label = "Du",          count = result.myBooks)
+                        ScoreCell(label = t.you,        count = result.myBooks)
                         VerticalDivider()
-                        ScoreCell(label = opponentName,  count = result.opBooks)
+                        ScoreCell(label = opponentName, count = result.opBooks)
                     }
                 }
 
@@ -1100,7 +1123,7 @@ private fun GameOverDialog(
                     Text("🏠", fontSize = 22.sp)
                     Spacer(Modifier.width(10.dp))
                     Text(
-                        "Zum Hauptmenü",
+                        t.toMainMenu,
                         style = MaterialTheme.typography.labelLarge,
                         color = Foam,
                         fontWeight = FontWeight.Bold
