@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Pastell-Ocean: für Window-Background / Statusbar -->
+    <color name="ocean_top">#FFE6F6FC</color>
+    <color name="ocean_mid">#FFBEE5F4</color>
+    <color name="ocean_deep">#FF8FCDE5</color>
+    <color name="deep_sea">#FF1F3D52</color>
+
+    <!-- Splash -->
+    <color name="splash_bg">#FF0B0B0E</color>
+
+    <!-- Defaults (für Kompatibilität, falls referenziert) -->
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+</resources>
