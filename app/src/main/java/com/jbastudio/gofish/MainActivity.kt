@@ -36,6 +36,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.jbastudio.gofish.network.GameClient
 import com.jbastudio.gofish.network.GameServer
+import com.jbastudio.gofish.network.OnlineGameClient
 import com.jbastudio.gofish.ui.components.Avatar
 import com.jbastudio.gofish.ui.components.AvatarChoice
 import com.jbastudio.gofish.ui.components.AvatarColor
@@ -49,13 +50,18 @@ import java.net.NetworkInterface
 
 class MainActivity : ComponentActivity() {
 
-    enum class Mode { HOST, JOIN }
+    /** Verbindungs-Modus der laufenden Aktion. */
+    enum class Mode { HOST, JOIN, ONLINE }
+
+    /** Welcher Bildschirm gerade sichtbar ist. */
+    enum class Screen { MENU, LOCAL, ONLINE }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val myIp = localIpAddress()
         val avatarPrefs = AvatarPrefs(this)
+        val netPrefs    = NetPrefs(this)
         // Initialer Avatar aus Prefs in den Holder spielen
         GameHolder.myAvatar = avatarPrefs.load()
 
@@ -69,15 +75,18 @@ class MainActivity : ComponentActivity() {
                 var mode    by remember { mutableStateOf<Mode?>(null) }
                 var avatarChoice  by remember { mutableStateOf(GameHolder.myAvatar) }
                 var showAvatarDlg by remember { mutableStateOf(false) }
+                var screen   by remember { mutableStateOf(Screen.MENU) }
+                var relayUrl by remember { mutableStateOf(netPrefs.loadRelayUrl()) }
                 // Token-Container: jeder Connect-Versuch bekommt eine eigene ID;
                 // wird sie inkrementiert, sind alle laufenden Callbacks "stale" und werden ignoriert.
                 val attempt = remember { intArrayOf(0) }
 
                 val cancel: () -> Unit = {
                     val cancelMsg = when (mode) {
-                        Mode.HOST -> "Hosting abgebrochen."
-                        Mode.JOIN -> "Suche abgebrochen."
-                        else      -> "Vorgang abgebrochen."
+                        Mode.HOST   -> "Hosting abgebrochen."
+                        Mode.JOIN   -> "Suche abgebrochen."
+                        Mode.ONLINE -> "Suche abgebrochen."
+                        else        -> "Vorgang abgebrochen."
                     }
                     attempt[0]++                       // invalidiert offene Callbacks
                     GameHolder.client?.apply {
@@ -98,8 +107,23 @@ class MainActivity : ComponentActivity() {
                     status  = cancelMsg
                 }
 
-                // System-Zurück bei aktiver Verbindung → Cancel statt App beenden
-                BackHandler(enabled = busy) { cancel() }
+                // System-Zurück: aktive Verbindung abbrechen, sonst zurück ins Hauptmenü
+                BackHandler(enabled = busy || screen != Screen.MENU) {
+                    when {
+                        busy -> cancel()
+                        else -> { status = ""; isError = false; screen = Screen.MENU }
+                    }
+                }
+
+                // Navigation vom Hauptmenü in einen Unterbildschirm
+                val goTo: (Screen) -> Unit = { target ->
+                    status = ""; isError = false; screen = target
+                }
+                // Zurück ins Hauptmenü (bricht ggf. eine laufende Aktion ab)
+                val backToMenu: () -> Unit = {
+                    if (busy) cancel() else { status = ""; isError = false }
+                    screen = Screen.MENU
+                }
 
                 if (showAvatarDlg) {
                     AvatarSelectionDialog(
@@ -113,7 +137,63 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-                LobbyScreen(
+                when (screen) {
+                  Screen.MENU -> MainMenuScreen(
+                      name          = name,
+                      onNameChange  = { name = it },
+                      avatar        = avatarChoice,
+                      onAvatarClick = { showAvatarDlg = true },
+                      onFindGame    = { goTo(Screen.ONLINE) },
+                      onLocalHost   = { goTo(Screen.LOCAL) }
+                  )
+
+                  Screen.ONLINE -> OnlineScreen(
+                      name           = name,
+                      onNameChange   = { name = it },
+                      avatar         = avatarChoice,
+                      onAvatarClick  = { showAvatarDlg = true },
+                      relayUrl       = relayUrl,
+                      onRelayUrlChange = { relayUrl = it; netPrefs.saveRelayUrl(it.trim()) },
+                      status         = status,
+                      isError        = isError,
+                      busy           = busy,
+                      onBack         = backToMenu,
+                      onCancel       = cancel,
+                      onFind = {
+                          val url = relayUrl.trim()
+                          if (url.isEmpty()) {
+                              status = "Bitte Server-URL eingeben"
+                              isError = true
+                          } else {
+                              netPrefs.saveRelayUrl(url)
+                              val finalName = name.trim().ifEmpty { "Spieler" }
+                              val myToken = ++attempt[0]
+                              busy    = true
+                              isError = false
+                              mode    = Mode.ONLINE
+                              status  = "Suche nach Gegner …"
+                              findOnlineMatch(
+                                  relayUrl = url,
+                                  name     = finalName,
+                                  token    = myToken,
+                                  onUpdate = { s, err ->
+                                      if (attempt[0] == myToken) runOnUiThread {
+                                          status  = s
+                                          isError = err
+                                          if (err) { busy = false; mode = null }
+                                      }
+                                  },
+                                  onSessionStart = {
+                                      if (attempt[0] == myToken) {
+                                          busy = false; mode = null; status = ""
+                                      }
+                                  }
+                              )
+                          }
+                      }
+                  )
+
+                  Screen.LOCAL -> LobbyScreen(
                     name           = name,
                     onNameChange   = { name = it },
                     hostIp         = hostIp,
@@ -125,6 +205,7 @@ class MainActivity : ComponentActivity() {
                     mode           = mode,
                     avatar         = avatarChoice,
                     onAvatarClick  = { showAvatarDlg = true },
+                    onBack         = backToMenu,
                     onCancel       = cancel,
                     onHost = {
                         val finalName = name.trim().ifEmpty { "Host" }
@@ -189,7 +270,8 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                     }
-                )
+                  )
+                } // when (screen)
             }
         }
     }
@@ -217,6 +299,36 @@ class MainActivity : ComponentActivity() {
         client.connect()
     }
 
+    /**
+     * Startet das Online-Matchmaking über das Relay.
+     *
+     * Der [OnlineGameClient] verbindet sich, sucht einen Gegner und übernimmt je
+     * nach zugewiesener Rolle die Host- oder Gast-Logik. Nach außen verhält er sich
+     * wie ein normaler Client (GAME_START → [GameActivity] starten).
+     */
+    private fun findOnlineMatch(
+        relayUrl: String,
+        name: String,
+        token: Int,
+        onUpdate: (String, Boolean) -> Unit,
+        onSessionStart: () -> Unit
+    ) {
+        val client = OnlineGameClient(relayUrl, name, GameHolder.myAvatar)
+            .also { GameHolder.client = it }
+        client.onConnected = { onUpdate("Gegner gefunden! Spiel startet …", false) }
+        client.onError     = { err -> onUpdate(friendlyError(err, Mode.ONLINE), true) }
+        client.onMessage   = { msg ->
+            if (msg.getString("type") == "GAME_START") {
+                GameHolder.gameStartMsg = msg
+                runOnUiThread {
+                    onSessionStart()
+                    startActivity(Intent(this, GameActivity::class.java))
+                }
+            }
+        }
+        client.connect()
+    }
+
     /** Übersetzt rohe Socket-/IO-Meldungen in spielerfreundliches Deutsch. */
     private fun friendlyError(raw: String, mode: Mode): String {
         val r = raw.lowercase()
@@ -227,11 +339,16 @@ class MainActivity : ComponentActivity() {
                     || r.contains("connection reset")
                     || r.contains("eof") ->
                 when (mode) {
-                    Mode.HOST -> "Hosting beendet."
-                    Mode.JOIN -> "Verbindung wurde getrennt."
+                    Mode.HOST   -> "Hosting beendet."
+                    Mode.JOIN   -> "Verbindung wurde getrennt."
+                    Mode.ONLINE -> "Verbindung zum Server getrennt."
                 }
+            r.contains("unable to resolve host") || r.contains("nodename nor servname")
+                    || r.contains("ungültige server-url") ->
+                "Server-Adresse ungültig oder nicht erreichbar."
             r.contains("connection refused") || r.contains("econnrefused") ->
-                "Server nicht erreichbar — IP korrekt eingegeben?"
+                if (mode == Mode.ONLINE) "Server nicht erreichbar — läuft der Relay-Server?"
+                else "Server nicht erreichbar — IP korrekt eingegeben?"
             r.contains("timeout") || r.contains("etimedout") ->
                 "Zeitüberschreitung — Server antwortet nicht."
             r.contains("network is unreachable") || r.contains("enetunreach") ->
@@ -299,22 +416,18 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+// ═════════════════════════════════════════════════════════════════════════
+//  Hauptmenü
+// ═════════════════════════════════════════════════════════════════════════
+
 @Composable
-private fun LobbyScreen(
+private fun MainMenuScreen(
     name: String,
     onNameChange: (String) -> Unit,
-    hostIp: String,
-    onHostIpChange: (String) -> Unit,
-    myIp: String,
-    status: String,
-    isError: Boolean,
-    busy: Boolean,
-    mode: MainActivity.Mode?,
     avatar: AvatarChoice,
     onAvatarClick: () -> Unit,
-    onCancel: () -> Unit,
-    onHost: () -> Unit,
-    onJoin: () -> Unit
+    onFindGame: () -> Unit,
+    onLocalHost: () -> Unit
 ) {
     OceanBackground {
         Column(
@@ -325,7 +438,6 @@ private fun LobbyScreen(
                 .padding(horizontal = 20.dp, vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Titel
             Text(
                 text  = "Go Fish!",
                 style = MaterialTheme.typography.displayLarge.copy(
@@ -368,26 +480,340 @@ private fun LobbyScreen(
 
             Spacer(Modifier.height(16.dp))
 
-            // Karte: Spieler-Name + Avatar-Wahl
+            // Name + Avatar (für beide Spielmodi verfügbar)
+            PlayerCard(
+                name          = name,
+                onNameChange  = onNameChange,
+                avatar        = avatar,
+                onAvatarClick = onAvatarClick,
+                enabled       = true
+            )
+
+            Spacer(Modifier.height(22.dp))
+
+            // Zwei Wege ins Spiel
+            PastelButton(
+                text      = "Finde ein Spiel!",
+                emoji     = "🌐",
+                enabled   = true,
+                container = SeafoamGreen,
+                onClick   = onFindGame
+            )
+            Spacer(Modifier.height(14.dp))
+            PastelButton(
+                text      = "Lokal hosten",
+                emoji     = "🏠",
+                enabled   = true,
+                container = Lavender,
+                onClick   = onLocalHost
+            )
+        }
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+//  Online-Bildschirm (Matchmaking über das Relay)
+// ═════════════════════════════════════════════════════════════════════════
+
+@Composable
+private fun OnlineScreen(
+    name: String,
+    onNameChange: (String) -> Unit,
+    avatar: AvatarChoice,
+    onAvatarClick: () -> Unit,
+    relayUrl: String,
+    onRelayUrlChange: (String) -> Unit,
+    status: String,
+    isError: Boolean,
+    busy: Boolean,
+    onBack: () -> Unit,
+    onCancel: () -> Unit,
+    onFind: () -> Unit
+) {
+    OceanBackground {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .systemBarsPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            BackRow(text = "Hauptmenü", enabled = !busy, onBack = onBack)
+
+            Text(
+                text  = "Online spielen",
+                style = MaterialTheme.typography.displayLarge.copy(
+                    fontSize = 42.sp, fontWeight = FontWeight.Black
+                ),
+                color = DeepSea,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = "Finde einen Gegner im Internet",
+                style = MaterialTheme.typography.titleMedium,
+                color = SoftSeaText,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(Modifier.height(16.dp))
+
+            PlayerCard(
+                name          = name,
+                onNameChange  = onNameChange,
+                avatar        = avatar,
+                onAvatarClick = onAvatarClick,
+                enabled       = !busy
+            )
+
+            Spacer(Modifier.height(14.dp))
+
+            // Karte: Relay-Server
             BubblePanel(modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(18.dp)) {
-                    SectionLabel("Dein Name")
-                    Spacer(Modifier.height(6.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        SectionLabel("Relay-Server")
+                        Spacer(Modifier.weight(1f))
+                        Text("🛰️", fontSize = 22.sp)
+                    }
+                    Spacer(Modifier.height(8.dp))
                     PastelTextField(
-                        value = name,
-                        onChange = onNameChange,
-                        placeholder = "z. B. Käpt'n Nemo",
-                        capWords = true,
+                        value = relayUrl,
+                        onChange = onRelayUrlChange,
+                        placeholder = "wss://dein-server.com/ws",
                         enabled = !busy
                     )
-                    Spacer(Modifier.height(14.dp))
-                    AvatarChooserRow(
-                        avatar  = avatar,
-                        enabled = !busy,
-                        onClick = onAvatarClick
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "Adresse deines Relay-Servers (wss://… empfohlen).",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = SoftSeaText
                     )
                 }
             }
+
+            Spacer(Modifier.height(18.dp))
+
+            if (busy) {
+                // Suche läuft — Status + Abbrechen
+                BubblePanel(
+                    modifier = Modifier.fillMaxWidth(),
+                    background = SunYellow.copy(alpha = 0.92f)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(18.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        FishMascot(
+                            modifier = Modifier.size(width = 96.dp, height = 70.dp),
+                            body = SeafoamGreen, bodyDeep = SeafoamDeep,
+                            facingRight = true
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = status.ifEmpty { "Suche nach Gegner …" },
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Center,
+                            color = DeepSea,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Spacer(Modifier.height(14.dp))
+                        PastelButton(
+                            text = "Suche abbrechen",
+                            emoji = "✋",
+                            enabled = true,
+                            container = CoralDeep,
+                            onClick = onCancel
+                        )
+                    }
+                }
+            } else {
+                PastelButton(
+                    text = "Spiel finden",
+                    emoji = "🔎",
+                    enabled = relayUrl.isNotBlank(),
+                    container = SeafoamGreen,
+                    onClick = onFind
+                )
+                if (relayUrl.isBlank()) {
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        "Bitte zuerst die Server-Adresse eintragen.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = SoftSeaText,
+                        textAlign = TextAlign.Center
+                    )
+                }
+                if (status.isNotEmpty()) {
+                    Spacer(Modifier.height(12.dp))
+                    BubblePanel(
+                        modifier = Modifier.fillMaxWidth(),
+                        background = if (isError) CoralPink.copy(alpha = 0.92f)
+                                     else         Lavender.copy(alpha = 0.85f)
+                    ) {
+                        Text(
+                            text = status,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            textAlign = TextAlign.Center,
+                            color = DeepSea,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+//  Gemeinsame Bausteine
+// ═════════════════════════════════════════════════════════════════════════
+
+/** Karte mit Namensfeld + Avatar-Auswahl — auf Hauptmenü, Online- und Lokal-Screen. */
+@Composable
+private fun PlayerCard(
+    name: String,
+    onNameChange: (String) -> Unit,
+    avatar: AvatarChoice,
+    onAvatarClick: () -> Unit,
+    enabled: Boolean
+) {
+    BubblePanel(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(18.dp)) {
+            SectionLabel("Dein Name")
+            Spacer(Modifier.height(6.dp))
+            PastelTextField(
+                value = name,
+                onChange = onNameChange,
+                placeholder = "z. B. Käpt'n Nemo",
+                capWords = true,
+                enabled = enabled
+            )
+            Spacer(Modifier.height(14.dp))
+            AvatarChooserRow(
+                avatar  = avatar,
+                enabled = enabled,
+                onClick = onAvatarClick
+            )
+        }
+    }
+}
+
+/** Zurück-Leiste oben links (führt zurück ins Hauptmenü). */
+@Composable
+private fun BackRow(text: String, enabled: Boolean, onBack: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Surface(
+            onClick = onBack,
+            enabled = enabled,
+            shape = RoundedCornerShape(16.dp),
+            color = Foam.copy(alpha = 0.85f),
+            contentColor = DeepSea
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("‹", fontSize = 24.sp, fontWeight = FontWeight.Black, color = DeepSea)
+                Spacer(Modifier.width(6.dp))
+                Text(text, style = MaterialTheme.typography.labelLarge, color = DeepSea)
+            }
+        }
+        Spacer(Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun LobbyScreen(
+    name: String,
+    onNameChange: (String) -> Unit,
+    hostIp: String,
+    onHostIpChange: (String) -> Unit,
+    myIp: String,
+    status: String,
+    isError: Boolean,
+    busy: Boolean,
+    mode: MainActivity.Mode?,
+    avatar: AvatarChoice,
+    onAvatarClick: () -> Unit,
+    onBack: () -> Unit,
+    onCancel: () -> Unit,
+    onHost: () -> Unit,
+    onJoin: () -> Unit
+) {
+    OceanBackground {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .systemBarsPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Zurück ins Hauptmenü
+            BackRow(text = "Hauptmenü", enabled = !busy, onBack = onBack)
+
+            // Titel
+            Text(
+                text  = "Lokal spielen",
+                style = MaterialTheme.typography.displayLarge.copy(
+                    fontSize = 42.sp, fontWeight = FontWeight.Black
+                ),
+                color = DeepSea,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = "Hosten oder im selben WLAN beitreten",
+                style = MaterialTheme.typography.titleMedium,
+                color = SoftSeaText,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(8.dp))
+
+            // Maskottchen-Reihe
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                FishMascot(
+                    modifier = Modifier.size(width = 70.dp, height = 50.dp),
+                    body = LavenderDeep, bodyDeep = LavenderDeep,
+                    facingRight = true
+                )
+                FishMascot(
+                    modifier = Modifier.size(width = 110.dp, height = 80.dp),
+                    body = CoralPink, bodyDeep = CoralDeep,
+                    facingRight = true
+                )
+                FishMascot(
+                    modifier = Modifier.size(width = 80.dp, height = 60.dp),
+                    body = SunYellow, bodyDeep = SunDeep,
+                    facingRight = false
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            // Karte: Spieler-Name + Avatar-Wahl
+            PlayerCard(
+                name          = name,
+                onNameChange  = onNameChange,
+                avatar        = avatar,
+                onAvatarClick = onAvatarClick,
+                enabled       = !busy
+            )
 
             Spacer(Modifier.height(14.dp))
 

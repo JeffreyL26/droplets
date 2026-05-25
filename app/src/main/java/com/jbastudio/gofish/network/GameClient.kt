@@ -10,18 +10,18 @@ import java.net.Socket
 
 class GameClient(
     private val serverHost: String,
-    val playerName: String,
+    override val playerName: String,
     private val avatar: AvatarChoice = AvatarChoice()
-) {
+) : GameSession {
     companion object { private const val TAG = "GoFishClient" }
 
     private var socket: Socket? = null
     private var writer: PrintWriter? = null
-    var playerId: Int = -1
+    override var playerId: Int = -1
 
-    var onMessage:   ((JSONObject) -> Unit)? = null
-    var onConnected: (() -> Unit)?           = null
-    var onError:     ((String) -> Unit)?     = null
+    override var onMessage:   ((JSONObject) -> Unit)? = null
+    override var onConnected: (() -> Unit)?           = null
+    override var onError:     ((String) -> Unit)?     = null
 
     fun connect() {
         Thread {
@@ -60,11 +60,11 @@ class GameClient(
         }.start()
     }
 
-    fun sendAsk(rank: String) {
+    override fun sendAsk(rank: String) {
         Thread {
             writer?.println(JSONObject().put("type", Protocol.ASK).put("rank", rank))
         }.start()
     }
 
-    fun disconnect() { runCatching { socket?.close() } }
+    override fun disconnect() { runCatching { socket?.close() } }
 }
