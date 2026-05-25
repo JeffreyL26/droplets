@@ -619,6 +619,7 @@ private fun SettingsButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
 }
 
 /** Flaggen-Sprachauswahl (Deutsch / Englisch / Spanisch / Französisch / Mandarin / Tagalog). */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun LanguageSelector(
     current: Language,
