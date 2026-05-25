@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Flagge Frankreich (Tricolore Blau/Weiß/Rot) — selbst erstellte Vektorgrafik, frei nutzbar. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="60dp"
+    android:height="40dp"
+    android:viewportWidth="60"
+    android:viewportHeight="40">
+    <path android:fillColor="#0055A4" android:pathData="M0,0 H20 V40 H0 Z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M20,0 H40 V40 H20 Z" />
+    <path android:fillColor="#EF4135" android:pathData="M40,0 H60 V40 H40 Z" />
+</vector>

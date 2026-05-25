@@ -52,6 +52,9 @@ import com.jbastudio.gofish.ui.components.AvatarColor
 import com.jbastudio.gofish.ui.components.AvatarKind
 import com.jbastudio.gofish.ui.components.BubblePanel
 import com.jbastudio.gofish.ui.components.GameAnimationOverlay
+import com.jbastudio.gofish.ui.components.GameIcon
+import com.jbastudio.gofish.ui.components.GameIconKind
+import com.jbastudio.gofish.ui.components.IconText
 import com.jbastudio.gofish.ui.components.HIGHLIGHT_DURATION_MS
 import com.jbastudio.gofish.ui.components.OceanBackground
 import com.jbastudio.gofish.ui.components.PlayingCardView
@@ -422,8 +425,14 @@ private fun GameScreen(state: GameUiState, onExit: () -> Unit, onAsk: (String) -
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    GameIcon(
+                        GameIconKind.ROD,
+                        modifier = Modifier.size(26.dp),
+                        tint = DeepSea
+                    )
+                    Spacer(Modifier.width(8.dp))
                     Text(
-                        text  = "🎣 Go Fish",
+                        text  = "Go Fish",
                         style = MaterialTheme.typography.titleLarge,
                         color = DeepSea
                     )
@@ -537,7 +546,7 @@ private fun OpponentPanel(name: String, avatar: AvatarChoice, handSize: Int, boo
                     style = MaterialTheme.typography.headlineMedium,
                     color = Foam
                 )
-                Text(
+                IconText(
                     LocalTexts.current.handAndBooks(handSize, books.size),
                     style = MaterialTheme.typography.bodyMedium,
                     color = Foam.copy(alpha = 0.92f)
@@ -560,7 +569,7 @@ private fun DeckBadge(deckSize: Int, modifier: Modifier = Modifier) {
                 .padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(LocalTexts.current.deckBadge, style = MaterialTheme.typography.titleMedium, color = Foam)
+            IconText(LocalTexts.current.deckBadge, style = MaterialTheme.typography.titleMedium, color = Foam)
             Text(
                 "$deckSize",
                 style = MaterialTheme.typography.displayMedium.copy(fontSize = 28.sp),
@@ -591,7 +600,7 @@ private fun BooksBadge(
                     color = DeepSea
                 )
                 Spacer(Modifier.weight(1f))
-                Text("📚 ${books.size}", color = DeepSea, fontWeight = FontWeight.Bold)
+                IconText("📚 ${books.size}", color = DeepSea, style = TextStyle(fontWeight = FontWeight.Bold))
             }
             Spacer(Modifier.height(4.dp))
             if (books.isEmpty()) {
@@ -648,10 +657,10 @@ private fun LogPanel(
                 .padding(horizontal = 12.dp, vertical = 8.dp)
         ) {
             if (entries.isEmpty()) {
-                Text(
+                IconText(
                     LocalTexts.current.logEmpty,
                     color = SoftSeaText,
-                    fontSize = 12.sp
+                    style = TextStyle(fontSize = 12.sp)
                 )
             }
             entries.forEach { entry -> LogRow(entry, myAvatar, opponentAvatar) }
@@ -696,7 +705,7 @@ private fun LogRow(entry: LogEntry, myAvatar: AvatarChoice, opponentAvatar: Avat
                         .size(width = 30.dp, height = 22.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("📚", fontSize = 16.sp)
+                    GameIcon(GameIconKind.BOOKS, modifier = Modifier.size(18.dp), tint = DeepSea)
                 }
                 Spacer(Modifier.width(6.dp))
                 Text(
@@ -713,11 +722,10 @@ private fun LogRow(entry: LogEntry, myAvatar: AvatarChoice, opponentAvatar: Avat
                 )
             }
             is LogEntry.System -> {
-                Text(
+                IconText(
                     text = entry.text,
                     color = SoftSeaText,
-                    fontSize = 12.sp,
-                    lineHeight = 16.sp
+                    style = TextStyle(fontSize = 12.sp, lineHeight = 16.sp)
                 )
             }
         }
@@ -742,7 +750,7 @@ private fun TurnStatusBar(
         modifier = Modifier.fillMaxWidth(),
         background = bg
     ) {
-        Text(
+        IconText(
             text,
             modifier = Modifier
                 .fillMaxWidth()
@@ -777,17 +785,17 @@ private fun HandGrid(
                 )
                 Spacer(Modifier.weight(1f))
                 if (sorted.size > 12) {
-                    Text(
+                    IconText(
                         LocalTexts.current.scrollHint,
                         color = SoftSeaText,
-                        fontSize = 11.sp,
+                        style = TextStyle(fontSize = 11.sp),
                         modifier = Modifier.padding(end = 8.dp)
                     )
                 }
-                Text(
+                IconText(
                     "🃏 ${cards.size}",
                     color = DeepSea,
-                    fontWeight = FontWeight.Bold
+                    style = TextStyle(fontWeight = FontWeight.Bold)
                 )
             }
             Spacer(Modifier.height(6.dp))
@@ -860,7 +868,7 @@ private fun AskButton(
                 pressedElevation = 2.dp
             )
         ) {
-            Text("🎣", fontSize = 22.sp)
+            GameIcon(GameIconKind.ROD, modifier = Modifier.size(24.dp), tint = DeepSea)
             Spacer(Modifier.width(10.dp))
             Text(
                 label,
@@ -882,11 +890,7 @@ private fun ExitButton(onClick: () -> Unit) {
             contentColor   = DeepSea
         )
     ) {
-        Text(
-            "✕",
-            fontWeight = FontWeight.Bold,
-            fontSize = 18.sp
-        )
+        GameIcon(GameIconKind.CLOSE, modifier = Modifier.size(18.dp), tint = DeepSea)
     }
 }
 
@@ -946,7 +950,7 @@ private fun SessionEndedDialog(message: String, onConfirm: () -> Unit) {
         titleContentColor = DeepSea,
         textContentColor  = DeepSea,
         title = {
-            Text(
+            IconText(
                 t.sessionEndedTitle,
                 style = MaterialTheme.typography.headlineMedium,
                 color = DeepSea
@@ -979,7 +983,7 @@ private fun SessionEndedDialog(message: String, onConfirm: () -> Unit) {
 // ═════════════════════════════════════════════════════════════════════════
 
 private data class ResultStyle(
-    val emoji: String,
+    val icon: GameIconKind,
     val accent: Color,
     val accentDeep: Color,
     val panelBg: Color
@@ -987,17 +991,17 @@ private data class ResultStyle(
 
 private fun styleFor(result: GameResult): ResultStyle = when (result) {
     is GameResult.Win -> ResultStyle(
-        emoji = "🏆",
+        icon = GameIconKind.TROPHY,
         accent = SunYellow, accentDeep = SunDeep,
         panelBg = SunYellow.copy(alpha = 0.30f)
     )
     is GameResult.Lose -> ResultStyle(
-        emoji = "🪝",
+        icon = GameIconKind.HOOK,
         accent = Lavender, accentDeep = LavenderDeep,
         panelBg = Lavender.copy(alpha = 0.35f)
     )
     is GameResult.Tie -> ResultStyle(
-        emoji = "🤝",
+        icon = GameIconKind.HANDSHAKE,
         accent = SeafoamGreen, accentDeep = SeafoamDeep,
         panelBg = SeafoamGreen.copy(alpha = 0.30f)
     )
@@ -1039,17 +1043,11 @@ private fun GameOverDialog(
                     .padding(horizontal = 24.dp, vertical = 28.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Großes Emoji
-                Text(
-                    style.emoji,
-                    fontSize = 72.sp,
-                    style = TextStyle(
-                        shadow = Shadow(
-                            color = style.accentDeep.copy(alpha = 0.45f),
-                            offset = Offset(0f, 8f),
-                            blurRadius = 16f
-                        )
-                    )
+                // Großes Ergebnis-Icon
+                GameIcon(
+                    style.icon,
+                    modifier = Modifier.size(76.dp),
+                    tint = style.accentDeep
                 )
                 Spacer(Modifier.height(8.dp))
 
@@ -1124,7 +1122,7 @@ private fun GameOverDialog(
                         pressedElevation = 2.dp
                     )
                 ) {
-                    Text("🏠", fontSize = 22.sp)
+                    GameIcon(GameIconKind.HOME, modifier = Modifier.size(22.dp), tint = Foam)
                     Spacer(Modifier.width(10.dp))
                     Text(
                         t.toMainMenu,
@@ -1179,7 +1177,7 @@ private fun ScoreCell(label: String, count: Int) {
         )
         Spacer(Modifier.height(2.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("📚", fontSize = 22.sp)
+            GameIcon(GameIconKind.BOOKS, modifier = Modifier.size(24.dp), tint = DeepSea)
             Spacer(Modifier.width(4.dp))
             Text(
                 text       = count.toString(),

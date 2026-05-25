@@ -1529,8 +1529,10 @@ private fun BookSplash(
         ),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        GameIcon(GameIconKind.BOOKS, modifier = Modifier.size(44.dp), tint = SunYellow)
+        Spacer(Modifier.height(4.dp))
         ComicTextBold(
-            text        = LocalTexts.current.animBook,
+            text        = LocalTexts.current.animBook.replace("📚", "").trim(),
             fontSize    = 56.sp,
             fillColor   = SunYellow,
             strokeColor = SuitDark,

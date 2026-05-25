@@ -30,6 +30,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -51,6 +52,9 @@ import com.jbastudio.gofish.ui.components.AvatarColor
 import com.jbastudio.gofish.ui.components.AvatarKind
 import com.jbastudio.gofish.ui.components.BubblePanel
 import com.jbastudio.gofish.ui.components.FishMascot
+import com.jbastudio.gofish.ui.components.GameIcon
+import com.jbastudio.gofish.ui.components.GameIconKind
+import com.jbastudio.gofish.ui.components.iconKindForEmoji
 import com.jbastudio.gofish.ui.components.OceanBackground
 import com.jbastudio.gofish.ui.theme.*
 import java.net.Inet4Address
@@ -73,6 +77,10 @@ class MainActivity : ComponentActivity() {
         val langPrefs   = LanguagePrefs(this)
         // Initialer Avatar aus Prefs in den Holder spielen
         GameHolder.myAvatar = avatarPrefs.load()
+        // App-Version für den Einstellungen-Dialog
+        val appVersion = runCatching {
+            packageManager.getPackageInfo(packageName, 0).versionName
+        }.getOrNull().orEmpty()
 
         setContent {
             GoFishTheme {
@@ -88,6 +96,7 @@ class MainActivity : ComponentActivity() {
                 // Optionaler, vom Nutzer gesetzter Server (z. B. zum Testen). Leer = Standard.
                 var serverOverride by remember { mutableStateOf(netPrefs.loadRelayUrl()) }
                 var showServerDlg  by remember { mutableStateOf(false) }
+                var showSettingsDlg by remember { mutableStateOf(false) }
                 // Aktuelle Sprache (live umschaltbar über die Flaggen im Hauptmenü)
                 var lang by remember { mutableStateOf(langPrefs.load()) }
                 val T: Texts = textsFor(lang)
@@ -190,6 +199,13 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
+                if (showSettingsDlg) {
+                    SettingsDialog(
+                        version = appVersion,
+                        onClose = { showSettingsDlg = false }
+                    )
+                }
+
                 if (showServerDlg) {
                     ServerDialog(
                         current = serverOverride,
@@ -217,7 +233,8 @@ class MainActivity : ComponentActivity() {
                       onFindGame    = startMatchmaking,
                       onLocalHost   = { goTo(Screen.LOCAL) },
                       language      = lang,
-                      onLanguageChange = { lang = it; langPrefs.save(it) }
+                      onLanguageChange = { lang = it; langPrefs.save(it) },
+                      onSettings    = { showSettingsDlg = true }
                   )
 
                   Screen.ONLINE -> OnlineScreen(
@@ -470,7 +487,8 @@ private fun MainMenuScreen(
     onFindGame: () -> Unit,
     onLocalHost: () -> Unit,
     language: Language,
-    onLanguageChange: (Language) -> Unit
+    onLanguageChange: (Language) -> Unit,
+    onSettings: () -> Unit
 ) {
     val t = LocalTexts.current
     OceanBackground {
@@ -553,33 +571,75 @@ private fun MainMenuScreen(
             )
         }
 
-        // Sprachauswahl unten rechts
+        // Sprachauswahl unten rechts. Volle Breite + linker Freiraum (72dp) für
+        // den Einstellungs-Button, damit die FlowRow bei Bedarf rechtsbündig
+        // umbrechen kann, ohne ihn zu überlappen.
         LanguageSelector(
             current = language,
             onSelect = onLanguageChange,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .systemBarsPadding()
+                .fillMaxWidth()
+                .padding(start = 72.dp, end = 16.dp, bottom = 16.dp)
+        )
+
+        // Einstellungen unten links
+        SettingsButton(
+            onClick = onSettings,
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .systemBarsPadding()
                 .padding(16.dp)
         )
     }
 }
 
-/** Flaggen-Sprachauswahl (Deutsch / Spanisch). */
+/** Eigenes Zahnrad-Icon (Vektorgrafik) unten links im Hauptmenü. */
+@Composable
+private fun SettingsButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val t = LocalTexts.current
+    Surface(
+        onClick = onClick,
+        modifier = modifier.size(44.dp),
+        shape = CircleShape,
+        color = Foam.copy(alpha = 0.85f),
+        contentColor = DeepSea,
+        shadowElevation = 4.dp
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                painter = painterResource(R.drawable.ic_settings),
+                contentDescription = t.settingsTitle,
+                tint = DeepSea,
+                modifier = Modifier.size(26.dp)
+            )
+        }
+    }
+}
+
+/** Flaggen-Sprachauswahl (Deutsch / Englisch / Spanisch / Französisch / Mandarin / Tagalog). */
 @Composable
 private fun LanguageSelector(
     current: Language,
     onSelect: (Language) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
+    // FlowRow statt Row: Bei zu wenig Breite (schmale Geräte) bricht die
+    // Flaggenreihe automatisch um, statt mit dem Einstellungs-Button zu
+    // kollidieren. Flaggen bleiben rechtsbündig; neue Reihen wachsen nach oben
+    // (Container ist unten verankert).
+    FlowRow(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically
+        horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         FlagButton(R.drawable.flag_de, selected = current == Language.DE) { onSelect(Language.DE) }
         FlagButton(R.drawable.flag_en, selected = current == Language.EN) { onSelect(Language.EN) }
         FlagButton(R.drawable.flag_es, selected = current == Language.ES) { onSelect(Language.ES) }
+        FlagButton(R.drawable.flag_fr, selected = current == Language.FR) { onSelect(Language.FR) }
+        FlagButton(R.drawable.flag_zh, selected = current == Language.ZH) { onSelect(Language.ZH) }
+        FlagButton(R.drawable.flag_tl, selected = current == Language.TL) { onSelect(Language.TL) }
     }
 }
 
@@ -843,6 +903,73 @@ private fun ServerDialog(
     }
 }
 
+/** Einstellungen / Info: Version, Herausgeber und eine kleine Widmung. */
+@Composable
+private fun SettingsDialog(
+    version: String,
+    onClose: () -> Unit
+) {
+    val t = LocalTexts.current
+    Dialog(
+        onDismissRequest = onClose,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        BubblePanel(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+            background = Foam,
+            cornerRadius = 28.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 26.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(t.settingsTitle, style = MaterialTheme.typography.headlineLarge, color = DeepSea)
+
+                Spacer(Modifier.height(22.dp))
+                Text(
+                    text = "Version " + version.ifBlank { "—" },
+                    style = MaterialTheme.typography.titleMedium,
+                    color = DeepSea
+                )
+
+                Spacer(Modifier.height(18.dp))
+                Text(
+                    text = t.publishedBy,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = SoftSeaText
+                )
+                Text(
+                    text = "jba~team",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = DeepSea
+                )
+
+                Spacer(Modifier.height(28.dp))
+                Text(
+                    text = "For my love, Bianka",
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.titleMedium.copy(fontStyle = FontStyle.Italic),
+                    color = CoralDeep
+                )
+
+                Spacer(Modifier.height(22.dp))
+                PastelButton(
+                    text = t.doneBtn,
+                    emoji = "✓",
+                    enabled = true,
+                    container = SeafoamGreen,
+                    onClick = onClose
+                )
+            }
+        }
+    }
+}
+
 // ═════════════════════════════════════════════════════════════════════════
 //  Gemeinsame Bausteine
 // ═════════════════════════════════════════════════════════════════════════
@@ -999,7 +1126,7 @@ private fun LobbyScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         SectionLabel(t.hostGame)
                         Spacer(Modifier.weight(1f))
-                        Text("🏠", fontSize = 22.sp)
+                        GameIcon(GameIconKind.HOME, modifier = Modifier.size(22.dp), tint = DeepSea)
                     }
                     Spacer(Modifier.height(6.dp))
                     Text(
@@ -1026,7 +1153,7 @@ private fun LobbyScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         SectionLabel(t.joinGame)
                         Spacer(Modifier.weight(1f))
-                        Text("🌊", fontSize = 22.sp)
+                        GameIcon(GameIconKind.WAVE, modifier = Modifier.size(22.dp), tint = DeepSea)
                     }
                     Spacer(Modifier.height(6.dp))
                     PastelTextField(
@@ -1164,7 +1291,13 @@ private fun PastelButton(
             pressedElevation = 2.dp
         )
     ) {
-        Text(emoji, fontSize = 22.sp)
+        // Emoji → eigenes Icon (Fallback: Emoji-Text, falls unbekannt)
+        val iconKind = iconKindForEmoji(emoji)
+        if (iconKind != null) {
+            GameIcon(iconKind, modifier = Modifier.size(24.dp), tint = DeepSea)
+        } else {
+            Text(emoji, fontSize = 22.sp)
+        }
         Spacer(Modifier.width(10.dp))
         Text(
             text,
@@ -1305,7 +1438,7 @@ private fun AvatarChooserRow(
                 color = SoftSeaText
             )
         }
-        Text("✏️", fontSize = 20.sp)
+        GameIcon(GameIconKind.PENCIL, modifier = Modifier.size(20.dp), tint = DeepSea)
     }
 }
 
@@ -1454,7 +1587,7 @@ private fun ColorSwatch(
         contentAlignment = Alignment.Center
     ) {
         if (selected) {
-            Text("✓", color = DeepSea, fontWeight = FontWeight.Black, fontSize = 18.sp)
+            GameIcon(GameIconKind.CHECK, modifier = Modifier.size(18.dp), tint = DeepSea)
         }
     }
 }
