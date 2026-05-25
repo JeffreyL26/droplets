@@ -6,8 +6,8 @@
     <color name="ocean_deep">#FF8FCDE5</color>
     <color name="deep_sea">#FF1F3D52</color>
 
-    <!-- Splash -->
-    <color name="splash_bg">#FF0B0B0E</color>
+    <!-- Splash (pastell, passend zum Compose-Verlauf) -->
+    <color name="splash_bg">#FFF4ECFC</color>
 
     <!-- Defaults (für Kompatibilität, falls referenziert) -->
     <color name="black">#FF000000</color>

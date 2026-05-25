@@ -9,11 +9,11 @@
         <item name="android:windowLightNavigationBar">true</item>
     </style>
 
-    <style name="Theme.GoFish.Splash" parent="android:Theme.Material.NoActionBar">
+    <style name="Theme.GoFish.Splash" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@color/splash_bg</item>
         <item name="android:statusBarColor">@color/splash_bg</item>
         <item name="android:navigationBarColor">@color/splash_bg</item>
-        <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
     </style>
 </resources>
