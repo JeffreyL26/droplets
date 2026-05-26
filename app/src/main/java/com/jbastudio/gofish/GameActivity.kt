@@ -233,14 +233,15 @@ class GameActivity : ComponentActivity() {
             state.winnerName = msg.getString("winnerName")
             val myBks  = msg.getInt("myBooks")
             val opBks  = msg.getInt("opBooks")
-            val myName = GameHolder.client?.playerName.orEmpty()
+            // Sieg/Niederlage über die (empfängerspezifischen, autoritativen)
+            // Buchzahlen bestimmen — NICHT über Namensvergleich. Zwei Spieler
+            // können denselben Namen tragen; dann sähen sonst beide „Gewonnen".
+            // Entspricht exakt der Engine-Regel (eindeutiges Maximum = Sieger,
+            // gleiche Zahl = Unentschieden).
             state.gameResult = when {
-                state.winnerName.equals(TIE_SENTINEL, ignoreCase = true) ->
-                    GameResult.Tie(myBks, opBks)
-                state.winnerName == myName ->
-                    GameResult.Win(myBks, opBks)
-                else ->
-                    GameResult.Lose(state.winnerName, myBks, opBks)
+                myBks > opBks -> GameResult.Win(myBks, opBks)
+                myBks < opBks -> GameResult.Lose(state.winnerName, myBks, opBks)
+                else          -> GameResult.Tie(myBks, opBks)
             }
             state.appendSystem(T.gameOverLog)
         }
@@ -298,6 +299,8 @@ class GameUiState {
     var overlayVisible: Boolean by mutableStateOf(false)
     /** Karten in der Hand, die kurz nach einer Animation aufleuchten sollen (Identifier = card.toString()). */
     var highlightedCards: Set<String> by mutableStateOf(emptySet())
+    /** Stammen die hervorgehobenen Karten aus einem Steal (grün) statt aus Go Fish (gelb)? */
+    var highlightFromSteal: Boolean by mutableStateOf(false)
 
     /** Startet eine Cue-Sequenz: erster wird aktiv, Rest in die Queue, Generation hoch. */
     fun playCueSequence(seq: List<AnimationCue>) {
@@ -398,6 +401,7 @@ private fun GameScreen(state: GameUiState, onExit: () -> Unit, onAsk: (String) -
                     state.myHand.map { it.toString() }.toSet()
                 )
                 if (actualIds.isNotEmpty()) {
+                    state.highlightFromSteal = c.kind == AnimationCue.Kind.STEAL
                     state.highlightedCards = actualIds
                     delay(HIGHLIGHT_DURATION_MS)
                     state.highlightedCards = emptySet()
@@ -495,6 +499,7 @@ private fun GameScreen(state: GameUiState, onExit: () -> Unit, onAsk: (String) -
                     cards            = state.myHand,
                     selectedRank     = state.selectedRank,
                     highlightedCards = state.highlightedCards,
+                    highlightStolen  = state.highlightFromSteal,
                     enabled          = state.myTurn && !state.overlayVisible,
                     onSelect         = { rank -> state.selectedRank = rank }
                 )
@@ -767,6 +772,7 @@ private fun HandGrid(
     cards: List<Card>,
     selectedRank: String?,
     highlightedCards: Set<String>,
+    highlightStolen: Boolean,
     enabled: Boolean,
     onSelect: (String) -> Unit
 ) {
@@ -820,12 +826,13 @@ private fun HandGrid(
                 ) {
                     items(sorted, key = { it.toString() }) { card ->
                         PlayingCardView(
-                            rank        = card.rank,
-                            suit        = card.suit,
-                            selected    = enabled && card.rank == selectedRank,
-                            highlighted = card.toString() in highlightedCards,
-                            modifier    = Modifier.aspectRatio(0.70f),
-                            onClick     = if (enabled) {
+                            rank            = card.rank,
+                            suit            = card.suit,
+                            selected        = enabled && card.rank == selectedRank,
+                            highlighted     = card.toString() in highlightedCards,
+                            highlightStolen = highlightStolen,
+                            modifier        = Modifier.aspectRatio(0.70f),
+                            onClick         = if (enabled) {
                                 { onSelect(card.rank) }
                             } else null
                         )

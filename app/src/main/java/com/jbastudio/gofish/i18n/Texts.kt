@@ -51,6 +51,7 @@ interface Texts {
 
     // ── Navigation ──
     val mainMenu: String
+    val backBtn: String
 
     // ── Einstellungen / Info ──
     val settingsTitle: String
@@ -211,6 +212,7 @@ object DeTexts : Texts {
     }
 
     override val mainMenu = "Hauptmenü"
+    override val backBtn = "Zurück"
     override val settingsTitle = "Einstellungen"
     override val publishedBy = "Herausgeber"
 
@@ -364,6 +366,7 @@ object EsTexts : Texts {
     }
 
     override val mainMenu = "Menú principal"
+    override val backBtn = "Atrás"
     override val settingsTitle = "Ajustes"
     override val publishedBy = "Editor"
 
@@ -517,6 +520,7 @@ object EnTexts : Texts {
     }
 
     override val mainMenu = "Main menu"
+    override val backBtn = "Back"
     override val settingsTitle = "Settings"
     override val publishedBy = "Publisher"
 
@@ -670,6 +674,7 @@ object FrTexts : Texts {
     }
 
     override val mainMenu = "Menu principal"
+    override val backBtn = "Retour"
     override val settingsTitle = "Paramètres"
     override val publishedBy = "Éditeur"
 
@@ -823,6 +828,7 @@ object ZhTexts : Texts {
     }
 
     override val mainMenu = "主菜单"
+    override val backBtn = "返回"
     override val settingsTitle = "设置"
     override val publishedBy = "发行方"
 
@@ -975,6 +981,7 @@ object TlTexts : Texts {
     }
 
     override val mainMenu = "Pangunahing menu"
+    override val backBtn = "Bumalik"
     override val settingsTitle = "Mga setting"
     override val publishedBy = "Naglathala"
 

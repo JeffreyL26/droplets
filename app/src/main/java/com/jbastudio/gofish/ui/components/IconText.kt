@@ -27,6 +27,7 @@ private val EMOJI_ICONS: List<Pair<String, GameIconKind>> = listOf(
     "🛰️" to GameIconKind.SATELLITE, "🛰" to GameIconKind.SATELLITE,
     "✏️" to GameIconKind.PENCIL,     "✏" to GameIconKind.PENCIL,
     "⬆️" to GameIconKind.ARROW_UP,   "⬆" to GameIconKind.ARROW_UP,
+    "⬅️" to GameIconKind.ARROW_LEFT, "⬅" to GameIconKind.ARROW_LEFT, "←" to GameIconKind.ARROW_LEFT,
     "↕️" to GameIconKind.SCROLL,     "↕" to GameIconKind.SCROLL,
     "🌐" to GameIconKind.GLOBE,
     "🏠" to GameIconKind.HOME,

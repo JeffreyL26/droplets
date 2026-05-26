@@ -958,8 +958,8 @@ private fun SettingsDialog(
 
                 Spacer(Modifier.height(22.dp))
                 PastelButton(
-                    text = t.doneBtn,
-                    emoji = "✓",
+                    text = t.backBtn,
+                    emoji = "⬅️",
                     enabled = true,
                     container = SeafoamGreen,
                     onClick = onClose

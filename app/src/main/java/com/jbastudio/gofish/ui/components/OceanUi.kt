@@ -310,10 +310,15 @@ fun PlayingCardView(
     modifier: Modifier = Modifier,
     selected: Boolean = false,
     highlighted: Boolean = false,
+    highlightStolen: Boolean = false,
     onClick: (() -> Unit)? = null
 ) {
     val isRed = suit == "♥" || suit == "♦"
     val suitColor = if (isRed) SuitRed else SuitDark
+
+    // Highlight-Farbe: grün für vom Gegner geangelte Karten, sonst gelb (Go Fish).
+    val hlAccent = if (highlightStolen) SeafoamDeep else SunDeep
+    val hlGlow   = if (highlightStolen) SeafoamGreen else SunYellow
 
     // Pulsierendes Highlight, wenn die Karte gerade neu in die Hand kam
     val pulse by rememberInfiniteTransition(label = "cardPulse").animateFloat(
@@ -329,12 +334,12 @@ fun PlayingCardView(
     val scale      = if (highlighted) 1f + pulse * 0.06f else 1f
 
     val borderColor = when {
-        highlighted -> SunDeep
+        highlighted -> hlAccent
         selected    -> SunDeep
         else        -> Color.Transparent
     }
     val bg = when {
-        highlighted -> SunYellow.copy(alpha = 0.55f + pulse * 0.3f)
+        highlighted -> hlGlow.copy(alpha = 0.55f + pulse * 0.3f)
         selected    -> SunYellow.copy(alpha = 0.5f)
         else        -> Foam
     }
@@ -350,8 +355,8 @@ fun PlayingCardView(
                     else        -> 6.dp
                 },
                 shape = RoundedCornerShape(14.dp),
-                ambientColor = if (highlighted) SunDeep.copy(alpha = pulseAlpha) else DeepSea.copy(alpha = 0.25f),
-                spotColor    = if (highlighted) SunDeep.copy(alpha = pulseAlpha) else DeepSea.copy(alpha = 0.25f)
+                ambientColor = if (highlighted) hlAccent.copy(alpha = pulseAlpha) else DeepSea.copy(alpha = 0.25f),
+                spotColor    = if (highlighted) hlAccent.copy(alpha = pulseAlpha) else DeepSea.copy(alpha = 0.25f)
             )
             .clip(RoundedCornerShape(14.dp))
             .background(bg)
