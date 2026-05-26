@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import com.jbastudio.gofish.ui.theme.DeepSea
 import kotlin.math.cos
 import kotlin.math.sin
@@ -24,7 +25,7 @@ import kotlin.math.sin
  */
 enum class GameIconKind {
     GLOBE, HOME, ROD, WAVE, FISH, SATELLITE, HAND, SEARCH, PENCIL, CHECK, CLOSE,
-    DECK, CARD, BOOKS, SCROLL, ARROW_UP, HOURGLASS, TROPHY, HOOK, HANDSHAKE,
+    DECK, CARD, BOOKS, BOOKS_CLASSIC, SCROLL, ARROW_UP, HOURGLASS, TROPHY, HOOK, HANDSHAKE,
     CLAPPER, FLAG_CHECKERED
 }
 
@@ -53,6 +54,7 @@ private fun DrawScope.drawGameIcon(kind: GameIconKind, c: Color) {
         GameIconKind.DECK           -> drawDeck(c)
         GameIconKind.CARD           -> drawCard(c)
         GameIconKind.BOOKS          -> drawBooks(c)
+        GameIconKind.BOOKS_CLASSIC  -> drawBooksClassic(c)
         GameIconKind.SCROLL         -> drawScroll(c)
         GameIconKind.ARROW_UP       -> drawArrowUp(c)
         GameIconKind.HOURGLASS      -> drawHourglass(c)
@@ -180,21 +182,23 @@ private fun DrawScope.drawSatellite(c: Color) {
 }
 
 private fun DrawScope.drawHand(c: Color) {
-    val w = size.width; val h = size.height; val s = sw()
-    // Handfläche
-    drawRoundRectCompat(c, Offset(w * 0.30f, h * 0.42f), Size(w * 0.42f, h * 0.40f), w * 0.10f)
-    // Finger (4)
-    val fingerW = w * 0.085f
-    listOf(0.33f, 0.45f, 0.57f, 0.69f).forEachIndexed { i, xf ->
-        val topY = if (i == 0 || i == 3) h * 0.30f else h * 0.22f
-        drawRoundRectCompat(c, Offset(w * xf, topY), Size(fingerW, h * 0.30f), fingerW * 0.5f)
+    val w = size.width; val h = size.height
+    val palmTop = h * 0.46f
+    // Handfläche — abgerundet, frontal (flache „Stopp"-Hand)
+    drawRoundRectCompat(c, Offset(w * 0.28f, palmTop), Size(w * 0.48f, h * 0.36f), w * 0.13f)
+    // Vier Finger dicht beieinander, leichte Längenstaffelung (Mittelfinger am längsten);
+    // die Unterkanten ragen in die Handfläche, sodass alles verbunden wirkt.
+    val fw = w * 0.105f
+    val gap = w * 0.018f
+    val startX = w * 0.285f
+    val fingerBottom = palmTop + h * 0.07f
+    val tipY = floatArrayOf(0.27f, 0.21f, 0.24f, 0.30f)   // Zeige-, Mittel-, Ring-, kleiner Finger
+    for (i in 0..3) {
+        val x = startX + i * (fw + gap)
+        drawRoundRectCompat(c, Offset(x, h * tipY[i]), Size(fw, fingerBottom - h * tipY[i]), fw * 0.5f)
     }
-    // Daumen
-    val thumb = Path().apply {
-        moveTo(w * 0.30f, h * 0.55f)
-        lineTo(w * 0.16f, h * 0.50f)
-    }
-    strokePath(thumb, c, s * 1.6f)
+    // Daumen — vom Handballen schräg nach oben-außen: offene, präsentierende Handfläche
+    line(Offset(w * 0.33f, h * 0.58f), Offset(w * 0.15f, h * 0.44f), c, w * 0.13f)
 }
 
 private fun DrawScope.drawSearch(c: Color) {
@@ -262,8 +266,29 @@ private fun DrawScope.drawCard(c: Color) {
 
 private fun DrawScope.drawBooks(c: Color) {
     val w = size.width; val h = size.height; val s = sw() * 0.8f
+    val bh = h * 0.185f
+    val r  = w * 0.035f
+    // Drei liegende Bücher, abwechselnd versetzt — je mit gefülltem Buchrücken
+    // und einem angedeuteten Seitenschnitt am gegenüberliegenden Ende.
+    val xs        = floatArrayOf(0.19f, 0.27f, 0.17f)
+    val ys        = floatArrayOf(0.585f, 0.385f, 0.185f)
+    val ws        = floatArrayOf(0.60f, 0.52f, 0.56f)
+    val spineLeft = booleanArrayOf(true, false, true)
+    for (i in 0..2) {
+        val x = w * xs[i]; val y = h * ys[i]; val bw = w * ws[i]
+        drawRoundRectCompat(c, Offset(x, y), Size(bw, bh), r, stroke = s)
+        val spineW = w * 0.055f
+        val spineX = if (spineLeft[i]) x else x + bw - spineW
+        drawRoundRectCompat(c, Offset(spineX, y), Size(spineW, bh), r * 0.6f)
+        val cutX = if (spineLeft[i]) x + bw - w * 0.05f else x + w * 0.05f
+        line(Offset(cutX, y + bh * 0.30f), Offset(cutX, y + bh * 0.70f), c, s * 0.6f)
+    }
+}
+
+/** Klassische Stapel-Variante — bewusst unverändert für die „BUCH!"-Abschlussanimation. */
+private fun DrawScope.drawBooksClassic(c: Color) {
+    val w = size.width; val h = size.height; val s = sw() * 0.8f
     val bh = h * 0.17f
-    // drei gestapelte, liegende Bücher mit leicht versetzten Kanten
     val books = listOf(
         Triple(w * 0.18f, h * 0.60f, w * 0.62f),
         Triple(w * 0.24f, h * 0.40f, w * 0.54f),
@@ -271,7 +296,6 @@ private fun DrawScope.drawBooks(c: Color) {
     )
     books.forEach { (x, y, bw) ->
         drawRoundRectCompat(c, Offset(x, y), Size(bw, bh), w * 0.03f, stroke = s)
-        // Seiten-Andeutung: kurze senkrechte Linie nahe der rechten Kante
         line(
             Offset(x + bw - w * 0.06f, y + bh * 0.20f),
             Offset(x + bw - w * 0.06f, y + bh * 0.80f),
@@ -306,38 +330,42 @@ private fun DrawScope.drawArrowUp(c: Color) {
 
 private fun DrawScope.drawHourglass(c: Color) {
     val w = size.width; val h = size.height; val s = sw()
-    // Deckel + Boden (kräftiger, abgerundet)
-    line(Offset(w * 0.26f, h * 0.16f), Offset(w * 0.74f, h * 0.16f), c, s * 1.2f)
-    line(Offset(w * 0.26f, h * 0.84f), Offset(w * 0.74f, h * 0.84f), c, s * 1.2f)
-    // Glas-Silhouette (Sanduhr-Form)
+    val cx = w * 0.5f
+    val topY = h * 0.15f; val botY = h * 0.85f
+    val xl = w * 0.30f; val xr = w * 0.70f
+    val neckY = h * 0.50f
+    // Rahmenplatten oben/unten — breiter als das Glas, kräftig & abgerundet
+    line(Offset(w * 0.22f, topY), Offset(w * 0.78f, topY), c, s * 1.4f)
+    line(Offset(w * 0.22f, botY), Offset(w * 0.78f, botY), c, s * 1.4f)
+    // schlanke Seitenstreben — vervollständigen die klassische Sanduhr-Silhouette
+    line(Offset(w * 0.265f, topY), Offset(w * 0.265f, botY), c, s * 0.5f)
+    line(Offset(w * 0.735f, topY), Offset(w * 0.735f, botY), c, s * 0.5f)
+    // Glas: zwei an der Taille zusammenlaufende Kammern
     val glass = Path().apply {
-        moveTo(w * 0.32f, h * 0.17f)
-        lineTo(w * 0.68f, h * 0.17f)
-        lineTo(w * 0.50f, h * 0.50f)
-        lineTo(w * 0.68f, h * 0.83f)
-        lineTo(w * 0.32f, h * 0.83f)
-        lineTo(w * 0.50f, h * 0.50f)
+        moveTo(xl, topY); lineTo(xr, topY)
+        lineTo(cx, neckY)
+        lineTo(xr, botY); lineTo(xl, botY)
+        lineTo(cx, neckY)
         close()
     }
-    strokePath(glass, c, s)
-    // Sand oben (gefülltes Dreieck)
+    strokePath(glass, c, s * 0.85f)
+    // Sand oben — an die Glaswände angepasster Trichter
     val sandTop = Path().apply {
-        moveTo(w * 0.37f, h * 0.29f)
-        lineTo(w * 0.63f, h * 0.29f)
-        lineTo(w * 0.50f, h * 0.49f)
+        moveTo(w * 0.385f, h * 0.30f)
+        lineTo(w * 0.615f, h * 0.30f)
+        lineTo(cx, neckY - h * 0.01f)
         close()
     }
     drawPath(sandTop, c)
-    // Sand unten (kleiner Haufen)
+    // rieselnder Sand durch die Taille
+    line(Offset(cx, neckY - h * 0.02f), Offset(cx, h * 0.70f), c, s * 0.45f)
+    // Sand unten — abgerundeter Haufen
     val sandBot = Path().apply {
-        moveTo(w * 0.40f, h * 0.82f)
-        lineTo(w * 0.60f, h * 0.82f)
-        lineTo(w * 0.50f, h * 0.67f)
+        moveTo(w * 0.37f, botY - h * 0.02f)
+        cubicTo(w * 0.42f, h * 0.69f, w * 0.58f, h * 0.69f, w * 0.63f, botY - h * 0.02f)
         close()
     }
     drawPath(sandBot, c)
-    // rieselnder Sand (dünne Mittellinie)
-    line(Offset(w * 0.50f, h * 0.50f), Offset(w * 0.50f, h * 0.70f), c, s * 0.5f)
 }
 
 private fun DrawScope.drawTrophy(c: Color) {
@@ -391,19 +419,29 @@ private fun DrawScope.drawHandshake(c: Color) {
 
 private fun DrawScope.drawClapper(c: Color) {
     val w = size.width; val h = size.height; val s = sw() * 0.7f
-    // Tafel
-    drawRoundRectCompat(c, Offset(w * 0.16f, h * 0.42f), Size(w * 0.68f, h * 0.42f), w * 0.04f, stroke = s)
-    // Klappe oben (schräg)
-    val clap = Path().apply {
-        moveTo(w * 0.16f, h * 0.40f)
-        lineTo(w * 0.80f, h * 0.24f)
-        lineTo(w * 0.84f, h * 0.40f)
+    // Schiefertafel (Umriss)
+    drawRoundRectCompat(c, Offset(w * 0.16f, h * 0.46f), Size(w * 0.68f, h * 0.38f), w * 0.05f, stroke = s)
+    // Klappe oben — gefülltes, schräg angehobenes Parallelogramm (Scharnier links)
+    val stick = Path().apply {
+        moveTo(w * 0.155f, h * 0.44f)
+        lineTo(w * 0.175f, h * 0.30f)
+        lineTo(w * 0.845f, h * 0.22f)
+        lineTo(w * 0.845f, h * 0.36f)
         close()
     }
-    strokePath(clap, c, s)
-    // Streifen auf der Klappe
-    listOf(0.30f, 0.46f, 0.62f).forEach { xf ->
-        line(Offset(w * xf, h * 0.39f), Offset(w * (xf + 0.06f), h * 0.27f), c, s * 0.7f)
+    drawPath(stick, c)
+    // Diagonale Streifen — als weiße Aussparungen, auf die Klappe begrenzt
+    clipPath(stick) {
+        var x = 0.04f
+        while (x < 0.95f) {
+            drawLine(
+                Color.White,
+                Offset(w * x, h * 0.48f),
+                Offset(w * (x + 0.11f), h * 0.16f),
+                strokeWidth = w * 0.05f
+            )
+            x += 0.145f
+        }
     }
 }
 

@@ -77,10 +77,6 @@ class MainActivity : ComponentActivity() {
         val langPrefs   = LanguagePrefs(this)
         // Initialer Avatar aus Prefs in den Holder spielen
         GameHolder.myAvatar = avatarPrefs.load()
-        // App-Version für den Einstellungen-Dialog
-        val appVersion = runCatching {
-            packageManager.getPackageInfo(packageName, 0).versionName
-        }.getOrNull().orEmpty()
 
         setContent {
             GoFishTheme {
@@ -201,7 +197,7 @@ class MainActivity : ComponentActivity() {
 
                 if (showSettingsDlg) {
                     SettingsDialog(
-                        version = appVersion,
+                        version = "Pre-Launch PD260526",
                         onClose = { showSettingsDlg = false }
                     )
                 }
@@ -699,7 +695,9 @@ private fun OnlineScreen(
                 .padding(horizontal = 20.dp, vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            BackRow(text = t.mainMenu, enabled = !busy, onBack = onBack)
+            // Hauptmenü bleibt während der Suche aktiv: onBack (= backToMenu)
+            // bricht eine laufende Suche ab und kehrt zum Menü zurück.
+            BackRow(text = t.mainMenu, enabled = true, onBack = onBack)
 
             Text(
                 text  = t.findGameTitle,
@@ -932,7 +930,7 @@ private fun SettingsDialog(
 
                 Spacer(Modifier.height(22.dp))
                 Text(
-                    text = "Version " + version.ifBlank { "—" },
+                    text = version,
                     style = MaterialTheme.typography.titleMedium,
                     color = DeepSea
                 )
