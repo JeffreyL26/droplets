@@ -71,7 +71,11 @@ class GameServer {
                     try {
                         val msg = JSONObject(line!!)
                         if (msg.getString("type") == Protocol.ASK)
-                            authority.playerAsk(pid, msg.getString("rank"))
+                            authority.playerAsk(
+                                pid,
+                                msg.getString("rank"),
+                                if (msg.has("targetId")) msg.getInt("targetId") else null
+                            )
                     } catch (e: Exception) {
                         log("Nachrichtenfehler von Spieler $pid: ${e.message}")
                     }
