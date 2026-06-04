@@ -60,9 +60,11 @@ class GameClient(
         }.start()
     }
 
-    override fun sendAsk(rank: String) {
+    override fun sendAsk(rank: String, targetId: Int?) {
         Thread {
-            writer?.println(JSONObject().put("type", Protocol.ASK).put("rank", rank))
+            val msg = JSONObject().put("type", Protocol.ASK).put("rank", rank)
+            if (targetId != null) msg.put("targetId", targetId)
+            writer?.println(msg)
         }.start()
     }
 

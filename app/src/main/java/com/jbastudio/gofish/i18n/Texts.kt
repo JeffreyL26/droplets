@@ -60,6 +60,12 @@ interface Texts {
     val soundLabel: String
     /** Titel des Musik-Reglers (Hintergrundmusik, getrennt vom Soundeffekt-Regler). */
     val musicLabel: String
+    /** Label für die Gegnerzahl-Auswahl in der Lobby. */
+    val opponentsLabel: String
+    /** Wartehinweis beim Hosten/Beitreten mit mehreren Spielern (X von N verbunden). */
+    fun lobbyWaiting(joined: Int, expected: Int): String
+    /** Fehler: Online-Mehrspieler vom Relay (noch) nicht unterstützt. */
+    val errOnlineMultiUnavailable: String
 
     // ── Lokal-Bildschirm ──
     val localTitle: String
@@ -137,6 +143,16 @@ interface Texts {
     fun oppAskedGoFish(rank: String, wentFishing: Boolean): String
     /** Gegner zog beim Angeln die gesuchte Karte und ist erneut am Zug. */
     fun oppDrawnHit(rank: String): String
+    /** Mehr-Gegner-Log: „fragte <Ziel> nach <Rang>" (Ziel benannt). */
+    fun oppAskedGotAt(target: String, rank: String, n: Int): String
+    fun oppAskedGoFishAt(target: String, rank: String): String
+    /** „Du" als Frage-Ziel (z. B. „fragte dich"). */
+    val youObject: String
+    /** Ein Spieler hat die Partie verlassen — Karten zurück ins Deck. */
+    fun playerLeftReshuffle(name: String): String
+    /** Fehlermeldungen bei fehlender Auswahl. */
+    val toastChooseCard: String
+    val toastChooseOpponent: String
     fun youBook(rank: String): String
     fun oppBook(rank: String): String
     val gameOverLog: String
@@ -178,6 +194,8 @@ interface Texts {
     val animDrawCard: String
     val animDeckEmpty: String
     val animCaught: String
+    /** Splash, wenn der Gegner einem Karten abnimmt (eigene Karten fliegen weg). */
+    val animGaveAway: String
     val animBook: String
     fun animBookComplete(rank: String): String
 }
@@ -223,6 +241,9 @@ object DeTexts : Texts {
     override val publishedBy = "Herausgeber"
     override val soundLabel = "Ton"
     override val musicLabel = "Musik"
+    override val opponentsLabel = "Gegner"
+    override fun lobbyWaiting(joined: Int, expected: Int) = "Warte auf Mitspieler … ($joined/$expected)"
+    override val errOnlineMultiUnavailable = "Online-Mehrspieler ist noch nicht verfügbar."
 
     override val localTitle = "Lokal spielen"
     override val localSubtitle = "Hosten oder im selben WLAN beitreten"
@@ -297,6 +318,12 @@ object DeTexts : Texts {
     override fun oppAskedGoFish(rank: String, wentFishing: Boolean) =
         "fragte nach $rank → Go Fish!" + if (wentFishing) " Zieht eine Karte." else ""
     override fun oppDrawnHit(rank: String) = "   ↳ Gezogen: $rank  ✓ Treffer — nochmal dran."
+    override fun oppAskedGotAt(target: String, rank: String, n: Int) = "fragte $target nach $rank → $n Karte(n)"
+    override fun oppAskedGoFishAt(target: String, rank: String) = "fragte $target nach $rank → Go Fish!"
+    override val youObject = "dich"
+    override fun playerLeftReshuffle(name: String) = "$name hat verlassen — Karten zurück ins Deck."
+    override val toastChooseCard = "Wähle zuerst eine Karte."
+    override val toastChooseOpponent = "Wähle zuerst einen Gegner."
     override fun youBook(rank: String) = "hast ein ${rank}er-Buch abgelegt!"
     override fun oppBook(rank: String) = "hat ein ${rank}er-Buch abgelegt!"
     override val gameOverLog = "🏁 Spiel beendet."
@@ -335,6 +362,7 @@ object DeTexts : Texts {
     override val animDrawCard = "du ziehst eine Karte"
     override val animDeckEmpty = "Deck ist leer"
     override val animCaught = "geangelt!"
+    override val animGaveAway = "abgegeben!"
     override val animBook = "📚  BUCH!"
     override fun animBookComplete(rank: String) = "${rank}er komplett"
 }
@@ -380,6 +408,9 @@ object EsTexts : Texts {
     override val publishedBy = "Editor"
     override val soundLabel = "Sonido"
     override val musicLabel = "Música"
+    override val opponentsLabel = "Rivales"
+    override fun lobbyWaiting(joined: Int, expected: Int) = "Esperando jugadores … ($joined/$expected)"
+    override val errOnlineMultiUnavailable = "El multijugador en línea aún no está disponible."
 
     override val localTitle = "Juego local"
     override val localSubtitle = "Crea o únete en la misma red WiFi"
@@ -454,6 +485,12 @@ object EsTexts : Texts {
     override fun oppAskedGoFish(rank: String, wentFishing: Boolean) =
         "pidió $rank → ¡Go Fish!" + if (wentFishing) " Roba una carta." else ""
     override fun oppDrawnHit(rank: String) = "   ↳ Robada: $rank  ✓ ¡Acierto — turno extra!"
+    override fun oppAskedGotAt(target: String, rank: String, n: Int) = "pidió $rank a $target → $n carta(s)"
+    override fun oppAskedGoFishAt(target: String, rank: String) = "pidió $rank a $target → ¡Go Fish!"
+    override val youObject = "ti"
+    override fun playerLeftReshuffle(name: String) = "$name se fue — cartas de vuelta al mazo."
+    override val toastChooseCard = "Elige primero una carta."
+    override val toastChooseOpponent = "Elige primero un rival."
     override fun youBook(rank: String) = "¡completaste un cuarteto de $rank!"
     override fun oppBook(rank: String) = "¡completó un cuarteto de $rank!"
     override val gameOverLog = "🏁 Partida terminada."
@@ -492,6 +529,7 @@ object EsTexts : Texts {
     override val animDrawCard = "robas una carta"
     override val animDeckEmpty = "El mazo está vacío"
     override val animCaught = "¡pescado!"
+    override val animGaveAway = "¡entregadas!"
     override val animBook = "📚  ¡CUARTETO!"
     override fun animBookComplete(rank: String) = "$rank completo"
 }
@@ -537,6 +575,9 @@ object EnTexts : Texts {
     override val publishedBy = "Publisher"
     override val soundLabel = "Sound"
     override val musicLabel = "Music"
+    override val opponentsLabel = "Opponents"
+    override fun lobbyWaiting(joined: Int, expected: Int) = "Waiting for players … ($joined/$expected)"
+    override val errOnlineMultiUnavailable = "Online multiplayer isn't available yet."
 
     override val localTitle = "Local play"
     override val localSubtitle = "Host or join on the same Wi-Fi"
@@ -611,6 +652,12 @@ object EnTexts : Texts {
     override fun oppAskedGoFish(rank: String, wentFishing: Boolean) =
         "asked for $rank → Go Fish!" + if (wentFishing) " Draws a card." else ""
     override fun oppDrawnHit(rank: String) = "   ↳ Drawn: $rank  ✓ Match — goes again."
+    override fun oppAskedGotAt(target: String, rank: String, n: Int) = "asked $target for $rank → $n card(s)"
+    override fun oppAskedGoFishAt(target: String, rank: String) = "asked $target for $rank → Go Fish!"
+    override val youObject = "you"
+    override fun playerLeftReshuffle(name: String) = "$name left — cards shuffled back into the deck."
+    override val toastChooseCard = "Choose a card first."
+    override val toastChooseOpponent = "Choose an opponent first."
     override fun youBook(rank: String) = "completed a book of ${rank}s!"
     override fun oppBook(rank: String) = "completed a book of ${rank}s!"
     override val gameOverLog = "🏁 Game over."
@@ -649,6 +696,7 @@ object EnTexts : Texts {
     override val animDrawCard = "you draw a card"
     override val animDeckEmpty = "The deck is empty"
     override val animCaught = "caught!"
+    override val animGaveAway = "handed over!"
     override val animBook = "📚  BOOK!"
     override fun animBookComplete(rank: String) = "$rank complete"
 }
@@ -694,6 +742,9 @@ object FrTexts : Texts {
     override val publishedBy = "Éditeur"
     override val soundLabel = "Son"
     override val musicLabel = "Musique"
+    override val opponentsLabel = "Adversaires"
+    override fun lobbyWaiting(joined: Int, expected: Int) = "En attente de joueurs … ($joined/$expected)"
+    override val errOnlineMultiUnavailable = "Le multijoueur en ligne n'est pas encore disponible."
 
     override val localTitle = "Jeu local"
     override val localSubtitle = "Héberge ou rejoins sur le même Wi-Fi"
@@ -768,6 +819,12 @@ object FrTexts : Texts {
     override fun oppAskedGoFish(rank: String, wentFishing: Boolean) =
         "a demandé $rank → Go Fish !" + if (wentFishing) " Pioche une carte." else ""
     override fun oppDrawnHit(rank: String) = "   ↳ Pioché : $rank  ✓ Réussi — rejoue."
+    override fun oppAskedGotAt(target: String, rank: String, n: Int) = "a demandé $rank à $target → $n carte(s)"
+    override fun oppAskedGoFishAt(target: String, rank: String) = "a demandé $rank à $target → Go Fish !"
+    override val youObject = "toi"
+    override fun playerLeftReshuffle(name: String) = "$name est parti — cartes remises dans la pioche."
+    override val toastChooseCard = "Choisis d'abord une carte."
+    override val toastChooseOpponent = "Choisis d'abord un adversaire."
     override fun youBook(rank: String) = "as complété un carré de $rank !"
     override fun oppBook(rank: String) = "a complété un carré de $rank !"
     override val gameOverLog = "🏁 Partie terminée."
@@ -806,6 +863,7 @@ object FrTexts : Texts {
     override val animDrawCard = "tu pioches une carte"
     override val animDeckEmpty = "La pioche est vide"
     override val animCaught = "pêché !"
+    override val animGaveAway = "données !"
     override val animBook = "📚  CARRÉ !"
     override fun animBookComplete(rank: String) = "$rank complété"
 }
@@ -851,6 +909,9 @@ object ZhTexts : Texts {
     override val publishedBy = "发行方"
     override val soundLabel = "音效"
     override val musicLabel = "音乐"
+    override val opponentsLabel = "对手"
+    override fun lobbyWaiting(joined: Int, expected: Int) = "等待玩家… ($joined/$expected)"
+    override val errOnlineMultiUnavailable = "在线多人游戏暂未开放。"
 
     override val localTitle = "本地游戏"
     override val localSubtitle = "在同一 Wi-Fi 下创建或加入"
@@ -924,6 +985,12 @@ object ZhTexts : Texts {
     override fun oppAskedGoFish(rank: String, wentFishing: Boolean) =
         "要了 $rank → Go Fish！" + if (wentFishing) " 抽一张牌。" else ""
     override fun oppDrawnHit(rank: String) = "   ↳ 抽到：$rank  ✓ 命中 — 再来一次。"
+    override fun oppAskedGotAt(target: String, rank: String, n: Int) = "向 $target 要 $rank → $n 张牌"
+    override fun oppAskedGoFishAt(target: String, rank: String) = "向 $target 要 $rank → Go Fish！"
+    override val youObject = "你"
+    override fun playerLeftReshuffle(name: String) = "$name 离开了 — 牌已洗回牌堆。"
+    override val toastChooseCard = "请先选一张牌。"
+    override val toastChooseOpponent = "请先选一个对手。"
     override fun youBook(rank: String) = "凑齐了一组 $rank！"
     override fun oppBook(rank: String) = "凑齐了一组 $rank！"
     override val gameOverLog = "🏁 游戏结束。"
@@ -962,6 +1029,7 @@ object ZhTexts : Texts {
     override val animDrawCard = "你抽一张牌"
     override val animDeckEmpty = "牌堆已空"
     override val animCaught = "钓到了！"
+    override val animGaveAway = "被拿走！"
     override val animBook = "📚  成组！"
     override fun animBookComplete(rank: String) = "$rank 凑齐"
 }
@@ -1007,6 +1075,9 @@ object TlTexts : Texts {
     override val publishedBy = "Naglathala"
     override val soundLabel = "Tunog"
     override val musicLabel = "Musika"
+    override val opponentsLabel = "Mga kalaban"
+    override fun lobbyWaiting(joined: Int, expected: Int) = "Naghihintay ng mga manlalaro … ($joined/$expected)"
+    override val errOnlineMultiUnavailable = "Hindi pa available ang online multiplayer."
 
     override val localTitle = "Lokal na laro"
     override val localSubtitle = "Mag-host o sumali sa parehong Wi-Fi"
@@ -1081,6 +1152,12 @@ object TlTexts : Texts {
     override fun oppAskedGoFish(rank: String, wentFishing: Boolean) =
         "humingi ng $rank → Go Fish!" + if (wentFishing) " Kumuha ng isang kard." else ""
     override fun oppDrawnHit(rank: String) = "   ↳ Kinuha: $rank  ✓ Tama — ulit siya."
+    override fun oppAskedGotAt(target: String, rank: String, n: Int) = "humingi ng $rank kay $target → $n kard"
+    override fun oppAskedGoFishAt(target: String, rank: String) = "humingi ng $rank kay $target → Go Fish!"
+    override val youObject = "iyo"
+    override fun playerLeftReshuffle(name: String) = "Umalis si $name — ibinalik ang mga kard sa baraha."
+    override val toastChooseCard = "Pumili muna ng kard."
+    override val toastChooseOpponent = "Pumili muna ng kalaban."
     override fun youBook(rank: String) = "nakakumpleto ng set ng $rank!"
     override fun oppBook(rank: String) = "nakakumpleto ng set ng $rank!"
     override val gameOverLog = "🏁 Tapos na ang laro."
@@ -1119,6 +1196,7 @@ object TlTexts : Texts {
     override val animDrawCard = "kumuha ka ng kard"
     override val animDeckEmpty = "Wala nang laman ang baraha"
     override val animCaught = "nahuli!"
+    override val animGaveAway = "naibigay!"
     override val animBook = "📚  SET!"
     override fun animBookComplete(rank: String) = "Kumpleto ang $rank"
 }

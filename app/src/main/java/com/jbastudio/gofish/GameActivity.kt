@@ -10,6 +10,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -84,7 +85,6 @@ class GameActivity : ComponentActivity() {
 
         // Eigener Avatar aus dem persistenten Holder
         state.myAvatar = GameHolder.myAvatar
-        state.opponentName = T.opponentDefault
 
         // gecachte GAME_START verarbeiten
         GameHolder.gameStartMsg?.let { handleMessage(it) }
@@ -103,24 +103,7 @@ class GameActivity : ComponentActivity() {
                     GameScreen(
                         state  = state,
                         onExit = { finish() },
-                        onAsk  = { rank ->
-                            if (!state.myTurn) return@GameScreen
-                            when {
-                                rank !in Card.RANKS ->
-                                    toast(T.toastNoSuchCard)
-                                state.myHand.none { it.rank == rank } ->
-                                    toast(T.toastMustHold(rank))
-                                else -> {
-                                    // WICHTIG: erst sperren, DANN senden. Beim Online-Host wird die
-                                    // ASK_RESULT-Antwort synchron (inline) verarbeitet — würde myTurn
-                                    // hier NACH dem Senden gesetzt, überschriebe diese Zeile den
-                                    // korrekten Extra-Zug (yourTurn=true) wieder mit false → Deadlock.
-                                    state.selectedRank = null
-                                    state.myTurn = false  // gesperrt bis Antwort kommt
-                                    GameHolder.client?.sendAsk(rank)
-                                }
-                            }
-                        }
+                        onAsk  = { attemptAsk() }
                     )
                 }
             }
@@ -131,27 +114,26 @@ class GameActivity : ComponentActivity() {
         when (msg.getString("type")) {
             "GAME_START"    -> handleGameStart(msg)
             "ASK_RESULT"    -> handleAskResult(msg)
+            "PLAYER_LEFT"   -> handlePlayerLeft(msg)
             "OPPONENT_LEFT" -> {
-                state.sessionEndedMessage = T.opponentLeft(state.opponentName)
+                state.sessionEndedMessage =
+                    T.opponentLeft(state.opponents.firstOrNull()?.name ?: T.opponentDefault)
             }
         }
     }
 
     private fun handleGameStart(msg: JSONObject) {
-        state.opponentName     = msg.getString("opponentName")
-        state.opponentAvatar   = parseAvatar(
-            kindStr  = msg.optString("opponentAvatarKind",  "FISH"),
-            colorStr = msg.optString("opponentAvatarColor", "SUN")
-        )
+        state.myId = msg.optInt("yourId", GameHolder.client?.playerId ?: -1)
         state.myHand.clear()
         state.myHand.addAll(Card.listFromJson(msg.getJSONArray("yourHand")))
-        state.myTurn           = msg.getBoolean("yourTurn")
-        state.deckSize         = msg.getInt("deckSize")
-        state.opponentHandSize = msg.getInt("opponentHandSize")
-        state.opponentBooks    = emptyList()
-        state.myBooks          = emptyList()
-        state.gameOver         = false
-        state.winnerName       = ""
+        state.myTurn   = msg.getBoolean("yourTurn")
+        state.deckSize = msg.getInt("deckSize")
+        state.myBooks  = emptyList()
+        state.gameOver = false
+        state.winnerName = ""
+        state.selectedRank = null
+        state.selectedTargetId = null
+        parsePlayers(msg)
         state.appendSystem(T.gameStartedAs(GameHolder.client?.playerName.orEmpty()))
     }
 
@@ -161,99 +143,179 @@ class GameActivity : ComponentActivity() {
         return AvatarChoice(kind, color)
     }
 
+    /** Übernimmt die Spielerliste aus einer Nachricht (alle außer mir = Gegner) + aktuellen Zug. */
+    private fun parsePlayers(msg: JSONObject) {
+        val arr = msg.optJSONArray("players") ?: return
+        val list = mutableListOf<OpponentInfo>()
+        for (i in 0 until arr.length()) {
+            val o = arr.getJSONObject(i)
+            val id = o.getInt("id")
+            if (id == state.myId) continue
+            list.add(
+                OpponentInfo(
+                    id       = id,
+                    name     = o.getString("name"),
+                    avatar   = parseAvatar(o.optString("avatarKind", "FISH"), o.optString("avatarColor", "SUN")),
+                    handSize = o.optInt("handSize", 0),
+                    books    = o.getJSONArray("books").let { b -> (0 until b.length()).map { b.getString(it) } },
+                    active   = o.optBoolean("active", true)
+                )
+            )
+        }
+        state.opponents = list
+        if (msg.has("currentPlayerId")) state.currentPlayerId = msg.getInt("currentPlayerId")
+    }
+
     private fun handleAskResult(msg: JSONObject) {
-        val rank       = msg.getString("rank")
-        val askerIsYou = msg.getBoolean("askerIsYou")
-        val gotCards   = msg.getBoolean("gotCards")
-        val wentFish   = msg.getBoolean("wentFishing")
-        val newBooks   = msg.getJSONArray("newBooks").let { a -> (0 until a.length()).map { a.getString(it) } }
-        val gameOver   = msg.getBoolean("gameOver")
+        val rank        = msg.getString("rank")
+        val askerId     = msg.optInt("askerId", -1)
+        val targetId    = msg.optInt("targetId", -1)
+        val askerIsYou  = msg.optBoolean("askerIsYou", false)
+        val targetIsYou = msg.optBoolean("targetIsYou", false)
+        val gotCards    = msg.getBoolean("gotCards")
+        val wentFish    = msg.getBoolean("wentFishing")
+        val newBooks    = msg.getJSONArray("newBooks").let { a -> (0 until a.length()).map { a.getString(it) } }
+        val gameOver    = msg.getBoolean("gameOver")
+
+        // Karten, die mir gerade abgenommen werden (für die „abgegeben"-Animation) —
+        // VOR dem Hand-Update abgreifen, sonst sind sie schon weg.
+        val cardsTakenFromMe: List<Card> =
+            if (targetIsYou && gotCards) state.myHand.filter { it.rank == rank } else emptyList()
 
         state.myHand.clear()
         state.myHand.addAll(Card.listFromJson(msg.getJSONArray("yourHand")))
-        state.myTurn = msg.getBoolean("yourTurn") && !gameOver
-        state.myBooks       = msg.getJSONArray("yourBooks").let { a -> (0 until a.length()).map { a.getString(it) } }
-        state.opponentBooks = msg.getJSONArray("opponentBooks").let { a -> (0 until a.length()).map { a.getString(it) } }
-        state.deckSize         = msg.getInt("deckSize")
-        state.opponentHandSize = msg.getInt("opponentHandSize")
+        state.myTurn   = msg.getBoolean("yourTurn") && !gameOver
+        state.myBooks  = msg.getJSONArray("yourBooks").let { a -> (0 until a.length()).map { a.getString(it) } }
+        state.deckSize = msg.getInt("deckSize")
+        parsePlayers(msg)
 
-        // Sammelt die Animations-Sequenz für diesen Spielzug (Main-Cue → optional Books)
+        // Namensnennung der Ziele erst nötig, wenn es mehr als einen aktiven Gegner gibt.
+        val multi       = state.activeOpponents.size >= 2
+        val askerName   = if (askerIsYou) T.you else state.opponentById(askerId)?.name ?: T.opponentDefault
+        val askerAvatar = if (askerIsYou) state.myAvatar else state.opponentById(askerId)?.avatar ?: AvatarChoice()
+        val targetName  = if (targetIsYou) T.youObject else state.opponentById(targetId)?.name ?: T.opponentDefault
+
         val cueSequence = mutableListOf<AnimationCue>()
 
         if (askerIsYou) {
             if (gotCards) {
                 val cards = Card.listFromJson(msg.getJSONArray("cardsReceived"))
-                cueSequence.add(AnimationCue(
-                    kind  = AnimationCue.Kind.STEAL,
-                    rank  = rank,
-                    cards = cards
-                ))
-                state.appendAction(isMe = true, name = T.you,
-                    text = T.youAskedGot(state.opponentName, rank, cards.size))
+                cueSequence.add(AnimationCue(AnimationCue.Kind.STEAL, rank, cards = cards))
+                state.appendAction(true, T.you, state.myAvatar, T.youAskedGot(targetName, rank, cards.size))
             } else {
-                state.appendAction(isMe = true, name = T.you,
-                    text = T.youAskedGoFish(rank))
+                state.appendAction(true, T.you, state.myAvatar, T.youAskedGoFish(rank))
                 val drawn: Card? =
                     if (msg.has("drawnCard")) Card.fromJson(msg.getJSONObject("drawnCard")) else null
-                cueSequence.add(AnimationCue(
-                    kind      = AnimationCue.Kind.GO_FISH,
-                    rank      = rank,
-                    drawnCard = drawn
-                ))
+                cueSequence.add(AnimationCue(AnimationCue.Kind.GO_FISH, rank, drawnCard = drawn))
                 if (drawn != null) {
-                    val matched = msg.getBoolean("drawnMatched")
+                    val matched = msg.optBoolean("drawnMatched", false)
                     state.appendSystem(if (matched) T.drawnCardHit(drawn.toString()) else T.drawnCard(drawn.toString()))
                 } else {
                     state.appendSystem(T.deckEmpty)
                 }
             }
-            // BOOK-Celebrations folgen direkt im Anschluss (eigene Cues in der Queue)
-            for (b in newBooks) {
-                cueSequence.add(AnimationCue(kind = AnimationCue.Kind.BOOK, rank = b))
-            }
+            for (b in newBooks) cueSequence.add(AnimationCue(AnimationCue.Kind.BOOK, rank = b))
         } else {
             if (gotCards) {
                 val n = msg.getInt("cardCount")
-                state.appendAction(isMe = false, name = state.opponentName,
-                    text = T.oppAskedGot(rank, n))
-            } else {
-                state.appendAction(isMe = false, name = state.opponentName,
-                    text = T.oppAskedGoFish(rank, wentFish))
-                // Gegner hat beim Angeln die gesuchte Karte gezogen → ist nochmal dran.
-                if (msg.optBoolean("drawnMatched", false)) {
-                    state.appendSystem(T.oppDrawnHit(rank))
+                state.appendAction(false, askerName, askerAvatar,
+                    if (multi) T.oppAskedGotAt(targetName, rank, n) else T.oppAskedGot(rank, n))
+                // Nur wenn MIR Karten abgenommen wurden: „abgegeben"-Flug nach oben.
+                if (targetIsYou && cardsTakenFromMe.isNotEmpty()) {
+                    cueSequence.add(AnimationCue(AnimationCue.Kind.GIVE, rank, cards = cardsTakenFromMe))
                 }
+            } else {
+                state.appendAction(false, askerName, askerAvatar,
+                    if (multi) T.oppAskedGoFishAt(targetName, rank) else T.oppAskedGoFish(rank, wentFish))
+                if (msg.optBoolean("drawnMatched", false)) state.appendSystem(T.oppDrawnHit(rank))
             }
         }
+
         for (b in newBooks) {
             state.appendBook(
                 isMe = askerIsYou,
-                name = if (askerIsYou) T.you else state.opponentName,
+                name = askerName,
                 text = if (askerIsYou) T.youBook(b) else T.oppBook(b)
             )
         }
 
-        if (gameOver) {
-            state.gameOver   = true
-            state.winnerName = msg.getString("winnerName")
-            val myBks  = msg.getInt("myBooks")
-            val opBks  = msg.getInt("opBooks")
-            // Sieg/Niederlage über die (empfängerspezifischen, autoritativen)
-            // Buchzahlen bestimmen — NICHT über Namensvergleich. Zwei Spieler
-            // können denselben Namen tragen; dann sähen sonst beide „Gewonnen".
-            // Entspricht exakt der Engine-Regel (eindeutiges Maximum = Sieger,
-            // gleiche Zahl = Unentschieden).
-            state.gameResult = when {
-                myBks > opBks -> GameResult.Win(myBks, opBks)
-                myBks < opBks -> GameResult.Lose(state.winnerName, myBks, opBks)
-                else          -> GameResult.Tie(myBks, opBks)
-            }
-            state.appendSystem(T.gameOverLog)
-        }
+        if (gameOver) handleGameOver(msg)
 
-        // Animations-Sequenz starten (falls eigene Aktion → STEAL/GO_FISH + ggf. BOOKs)
-        if (cueSequence.isNotEmpty()) {
-            state.playCueSequence(cueSequence)
+        if (cueSequence.isNotEmpty()) state.playCueSequence(cueSequence)
+    }
+
+    private fun handleGameOver(msg: JSONObject) {
+        state.gameOver   = true
+        state.winnerName = msg.optString("winnerName", TIE_SENTINEL)
+        val standings = buildStandings(msg)
+        val myScore   = standings.firstOrNull { it.isMe }?.books ?: 0
+        val top       = standings.maxOfOrNull { it.books } ?: 0
+        val uniqueTop = standings.count { it.books == top } == 1
+        state.gameResult = when {
+            myScore >= top && uniqueTop -> GameResult.Win(standings)
+            myScore >= top              -> GameResult.Tie(standings)
+            else                        -> GameResult.Lose(state.winnerName, standings)
+        }
+        state.appendSystem(T.gameOverLog)
+    }
+
+    /** Endstand aller noch aktiven Spieler aus der Spielerliste. */
+    private fun buildStandings(msg: JSONObject): List<PlayerScore> {
+        val arr = msg.optJSONArray("players")
+        if (arr != null) {
+            return (0 until arr.length()).mapNotNull { i ->
+                val o = arr.getJSONObject(i)
+                if (!o.optBoolean("active", true)) return@mapNotNull null
+                val id = o.getInt("id")
+                val isMe = id == state.myId
+                PlayerScore(
+                    name  = if (isMe) T.you else o.getString("name"),
+                    books = o.getJSONArray("books").length(),
+                    isMe  = isMe
+                )
+            }
+        }
+        return listOf(
+            PlayerScore(T.you, msg.optInt("myBooks", state.myBooks.size), true),
+            PlayerScore(state.opponents.firstOrNull()?.name ?: T.opponentDefault, msg.optInt("opBooks", 0), false)
+        )
+    }
+
+    private fun handlePlayerLeft(msg: JSONObject) {
+        val leftId   = msg.optInt("playerId", -1)
+        val leftName = msg.optString("playerName", T.opponentDefault)
+        if (msg.has("yourHand")) {
+            state.myHand.clear()
+            state.myHand.addAll(Card.listFromJson(msg.getJSONArray("yourHand")))
+        }
+        state.myTurn   = msg.optBoolean("yourTurn", state.myTurn) && !msg.optBoolean("gameOver", false)
+        state.deckSize = msg.optInt("deckSize", state.deckSize)
+        parsePlayers(msg)
+        if (state.selectedTargetId == leftId) state.selectedTargetId = null
+        state.appendSystem(T.playerLeftReshuffle(leftName))
+    }
+
+    /** Validiert die Auswahl und schickt die Frage; zeigt sonst eine Fehlermeldung. */
+    private fun attemptAsk() {
+        if (!state.myTurn) return
+        val rank = state.selectedRank
+        val targetId = state.selectedTargetId ?: state.activeOpponents.singleOrNull()?.id
+        when {
+            rank == null ->
+                toast(T.toastChooseCard)
+            rank !in Card.RANKS ->
+                toast(T.toastNoSuchCard)
+            state.myHand.none { it.rank == rank } ->
+                toast(T.toastMustHold(rank))
+            targetId == null ->
+                toast(T.toastChooseOpponent)
+            else -> {
+                // WICHTIG: erst sperren, DANN senden (Online-Host verarbeitet inline).
+                state.selectedRank = null
+                state.selectedTargetId = null
+                state.myTurn = false
+                GameHolder.client?.sendAsk(rank, targetId)
+            }
         }
     }
 
@@ -275,12 +337,23 @@ class GameActivity : ComponentActivity() {
 //  UI State (haltbar in der Activity)
 // ─────────────────────────────────────────────────────────────────────────
 
+/** Ein Gegner am Tisch (für die N-Spieler-fähige UI). */
+data class OpponentInfo(
+    val id: Int,
+    val name: String,
+    val avatar: AvatarChoice,
+    val handSize: Int,
+    val books: List<String>,
+    val active: Boolean
+)
+
 class GameUiState {
-    var opponentName     by mutableStateOf("Gegner")
-    var opponentAvatar   by mutableStateOf(AvatarChoice())
     var myAvatar         by mutableStateOf(AvatarChoice())
-    var opponentHandSize by mutableStateOf(0)
-    var opponentBooks    by mutableStateOf<List<String>>(emptyList())
+    var myId             by mutableStateOf(-1)
+    /** Alle Gegner (1–3), in Sitzreihenfolge. */
+    var opponents        by mutableStateOf<List<OpponentInfo>>(emptyList())
+    /** Wer ist gerade am Zug (Spieler-ID). */
+    var currentPlayerId  by mutableStateOf(-1)
     var deckSize         by mutableStateOf(0)
     val myHand: SnapshotStateList<Card> = mutableStateListOf()
     var myBooks          by mutableStateOf<List<String>>(emptyList())
@@ -289,8 +362,10 @@ class GameUiState {
     var winnerName       by mutableStateOf("")
     val logEntries: SnapshotStateList<LogEntry> = mutableStateListOf()
     var selectedRank: String? by mutableStateOf(null)
+    /** Gewählter Frage-Gegner (nur nötig, wenn es mehr als einen aktiven Gegner gibt). */
+    var selectedTargetId: Int? by mutableStateOf(null)
 
-    /** Wenn != null, ist die Sitzung beendet (z.B. Mitspieler hat verlassen). */
+    /** Wenn != null, ist die Sitzung beendet (z.B. letzter Mitspieler hat verlassen). */
     var sessionEndedMessage: String? by mutableStateOf(null)
     /** Wenn != null, ist das Spiel regulär zu Ende — Popup zeigt das Ergebnis. */
     var gameResult: GameResult? by mutableStateOf(null)
@@ -307,6 +382,11 @@ class GameUiState {
     /** Stammen die hervorgehobenen Karten aus einem Steal (grün) statt aus Go Fish (gelb)? */
     var highlightFromSteal: Boolean by mutableStateOf(false)
 
+    /** Noch aktive Gegner (verlassene ausgenommen). */
+    val activeOpponents: List<OpponentInfo> get() = opponents.filter { it.active }
+
+    fun opponentById(id: Int): OpponentInfo? = opponents.firstOrNull { it.id == id }
+
     /** Startet eine Cue-Sequenz: erster wird aktiv, Rest in die Queue, Generation hoch. */
     fun playCueSequence(seq: List<AnimationCue>) {
         if (seq.isEmpty()) return
@@ -316,8 +396,8 @@ class GameUiState {
         cueGeneration++
     }
 
-    fun appendAction(isMe: Boolean, name: String, text: String) {
-        logEntries.add(LogEntry.Action(isMe, name, text))
+    fun appendAction(isMe: Boolean, name: String, avatar: AvatarChoice, text: String) {
+        logEntries.add(LogEntry.Action(isMe, name, avatar, text))
     }
     fun appendBook(isMe: Boolean, name: String, text: String) {
         logEntries.add(LogEntry.Book(isMe, name, text))
@@ -328,21 +408,23 @@ class GameUiState {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-//  Log-Einträge
+//  Log-Einträge & Ergebnis
 // ─────────────────────────────────────────────────────────────────────────
+
+/** Punktestand eines Spielers im Endbildschirm. */
+data class PlayerScore(val name: String, val books: Int, val isMe: Boolean)
 
 /** Ergebnis am Spielende — steuert das GameOver-Popup. */
 sealed class GameResult {
-    abstract val myBooks: Int
-    abstract val opBooks: Int
-    data class Win (override val myBooks: Int, override val opBooks: Int) : GameResult()
-    data class Lose(val winnerName: String, override val myBooks: Int, override val opBooks: Int) : GameResult()
-    data class Tie (override val myBooks: Int, override val opBooks: Int) : GameResult()
+    abstract val standings: List<PlayerScore>
+    data class Win (override val standings: List<PlayerScore>) : GameResult()
+    data class Lose(val winnerName: String, override val standings: List<PlayerScore>) : GameResult()
+    data class Tie (override val standings: List<PlayerScore>) : GameResult()
 }
 
 sealed class LogEntry {
-    /** Spieler-Aktion (Frage, Antwort etc.) — bekommt Mini-Fisch + fetten Namen. */
-    data class Action(val isMe: Boolean, val name: String, val text: String) : LogEntry()
+    /** Spieler-Aktion (Frage, Antwort etc.) — bekommt Avatar + fetten Namen. */
+    data class Action(val isMe: Boolean, val name: String, val avatar: AvatarChoice, val text: String) : LogEntry()
     /** Spieler hat ein Buch abgelegt — bekommt 📚-Icon + fetten Namen. */
     data class Book(val isMe: Boolean, val name: String, val text: String) : LogEntry()
     /** System-Meldung — neutraler Text, kein Avatar. */
@@ -354,7 +436,7 @@ sealed class LogEntry {
 // ─────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun GameScreen(state: GameUiState, onExit: () -> Unit, onAsk: (String) -> Unit) {
+private fun GameScreen(state: GameUiState, onExit: () -> Unit, onAsk: () -> Unit) {
     var showExitDialog by remember { mutableStateOf(false) }
     val sessionEnded = state.sessionEndedMessage
     val gameResult   = state.gameResult
@@ -377,10 +459,9 @@ private fun GameScreen(state: GameUiState, onExit: () -> Unit, onAsk: (String) -
 
     if (gameResult != null && sessionEnded == null) {
         GameOverDialog(
-            result       = gameResult,
-            opponentName = state.opponentName,
-            onExit       = onExit,
-            onDismiss    = { state.gameResult = null }
+            result    = gameResult,
+            onExit    = onExit,
+            onDismiss = { state.gameResult = null }
         )
     }
 
@@ -393,13 +474,13 @@ private fun GameScreen(state: GameUiState, onExit: () -> Unit, onAsk: (String) -
         try {
             while (true) {
                 state.overlayVisible = true
-                // Sound passend zur Animation. STEAL/GO_FISH/BOOK-Cues entstehen
-                // nur für eigene Aktionen (siehe handleAskResult), daher klingt
-                // jeder Effekt genau dann, wenn man selbst angelt bzw. ein Buch legt.
+                // Sound passend zur Animation: GO_FISH/STEAL/BOOK entstehen nur für
+                // eigene Aktionen. GIVE (eigene Karten werden geangelt) bleibt stumm.
                 when (c.kind) {
                     AnimationCue.Kind.GO_FISH -> GameSounds.playGoFish()
                     AnimationCue.Kind.STEAL   -> GameSounds.playSteal(c.cards.size)
                     AnimationCue.Kind.BOOK    -> GameSounds.playBook()
+                    AnimationCue.Kind.GIVE    -> {}
                 }
                 delay(ANIMATION_DURATION_MS)
                 state.overlayVisible = false
@@ -407,6 +488,7 @@ private fun GameScreen(state: GameUiState, onExit: () -> Unit, onAsk: (String) -
                     AnimationCue.Kind.GO_FISH -> c.drawnCard?.let { setOf(it.toString()) } ?: emptySet()
                     AnimationCue.Kind.STEAL   -> c.cards.map { it.toString() }.toSet()
                     AnimationCue.Kind.BOOK    -> emptySet()
+                    AnimationCue.Kind.GIVE    -> emptySet()
                 }
                 // Nur tatsächlich noch in der Hand befindliche Karten hervorheben.
                 // (Bei einem 3-Karten-Steal sind die Karten z.B. schon in einem Buch.)
@@ -464,12 +546,12 @@ private fun GameScreen(state: GameUiState, onExit: () -> Unit, onAsk: (String) -
 
                 Spacer(Modifier.height(8.dp))
 
-                // Gegner-Panel
-                OpponentPanel(
-                    name      = state.opponentName,
-                    avatar    = state.opponentAvatar,
-                    handSize  = state.opponentHandSize,
-                    books     = state.opponentBooks
+                // Gegner-Panel(s) — ab 2 Gegnern als antippbare Auswahl
+                OpponentArea(
+                    opponents        = state.opponents,
+                    selectedTargetId = state.selectedTargetId,
+                    selectable       = state.myTurn && !state.overlayVisible && state.activeOpponents.size >= 2,
+                    onSelect         = { id -> GameSounds.playClick(); state.selectedTargetId = id }
                 )
 
                 Spacer(Modifier.height(10.dp))
@@ -492,10 +574,8 @@ private fun GameScreen(state: GameUiState, onExit: () -> Unit, onAsk: (String) -
 
                 // Log (nimmt allen freien Platz)
                 LogPanel(
-                    entries        = state.logEntries,
-                    myAvatar       = state.myAvatar,
-                    opponentAvatar = state.opponentAvatar,
-                    modifier       = Modifier
+                    entries  = state.logEntries,
+                    modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
                 )
@@ -504,10 +584,10 @@ private fun GameScreen(state: GameUiState, onExit: () -> Unit, onAsk: (String) -
 
                 // Status / Turn Indicator
                 TurnStatusBar(
-                    myTurn       = state.myTurn,
-                    gameOver     = state.gameOver,
-                    winnerName   = state.winnerName,
-                    opponentName = state.opponentName
+                    myTurn            = state.myTurn,
+                    gameOver          = state.gameOver,
+                    winnerName        = state.winnerName,
+                    currentPlayerName = state.opponentById(state.currentPlayerId)?.name ?: ""
                 )
 
                 Spacer(Modifier.height(10.dp))
@@ -530,8 +610,8 @@ private fun GameScreen(state: GameUiState, onExit: () -> Unit, onAsk: (String) -
                 // Frage-Button
                 AskButton(
                     selectedRank = state.selectedRank,
-                    enabled      = state.myTurn && state.selectedRank != null && !state.overlayVisible,
-                    onAsk        = { state.selectedRank?.let(onAsk) }
+                    enabled      = state.myTurn && !state.overlayVisible,
+                    onAsk        = onAsk
                 )
             }
         }
@@ -547,39 +627,102 @@ private fun GameScreen(state: GameUiState, onExit: () -> Unit, onAsk: (String) -
 //  Teil-Komponenten
 // ─────────────────────────────────────────────────────────────────────────
 
+/** Bereich oben: 1 Gegner = volle Breite; 2–3 Gegner = nebeneinander, je antippbar. */
 @Composable
-private fun OpponentPanel(name: String, avatar: AvatarChoice, handSize: Int, books: List<String>) {
-    BubblePanel(
-        modifier = Modifier.fillMaxWidth(),
-        background = LavenderDeep.copy(alpha = 0.85f)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically
+private fun OpponentArea(
+    opponents: List<OpponentInfo>,
+    selectedTargetId: Int?,
+    selectable: Boolean,
+    onSelect: (Int) -> Unit
+) {
+    when {
+        opponents.isEmpty() -> Unit
+        opponents.size == 1 -> OpponentPanel(
+            opp = opponents.first(),
+            selected = false,
+            selectable = false,
+            onClick = {}
+        )
+        else -> Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Avatar(
-                choice = avatar,
-                modifier = Modifier.size(width = 78.dp, height = 60.dp),
-                facingRight = true,
-                animated = true
-            )
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    name,
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = Foam
+            opponents.forEach { o ->
+                OpponentPanel(
+                    opp = o,
+                    selected = selectable && o.id == selectedTargetId,
+                    selectable = selectable && o.active,
+                    onClick = { onSelect(o.id) },
+                    compact = true,
+                    modifier = Modifier.weight(1f)
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun OpponentPanel(
+    opp: OpponentInfo,
+    selected: Boolean,
+    selectable: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    compact: Boolean = false
+) {
+    val t = LocalTexts.current
+    val bg = when {
+        !opp.active -> OceanDeep.copy(alpha = 0.40f)          // verlassen → ausgegraut
+        selected    -> SeafoamDeep                            // ausgewähltes Ziel
+        else        -> LavenderDeep.copy(alpha = 0.85f)
+    }
+    val fg = Foam.copy(alpha = if (opp.active) 1f else 0.55f)
+    val panelMod = (if (compact) modifier else modifier.fillMaxWidth())
+        .then(if (selectable) Modifier.clickable { onClick() } else Modifier)
+
+    BubblePanel(modifier = panelMod, background = bg) {
+        if (compact) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(10.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Avatar(
+                    choice = opp.avatar,
+                    modifier = Modifier.size(width = 54.dp, height = 42.dp),
+                    facingRight = true,
+                    animated = opp.active && selected
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(opp.name, style = MaterialTheme.typography.titleSmall, color = fg, maxLines = 1)
                 IconText(
-                    LocalTexts.current.handAndBooks(handSize, books.size),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Foam.copy(alpha = 0.92f)
+                    t.handAndBooks(opp.handSize, opp.books.size),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = fg
                 )
-                if (books.isNotEmpty()) {
-                    Spacer(Modifier.height(4.dp))
-                    BookChips(books, chipColor = SunYellow)
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Avatar(
+                    choice = opp.avatar,
+                    modifier = Modifier.size(width = 78.dp, height = 60.dp),
+                    facingRight = true,
+                    animated = opp.active
+                )
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(opp.name, style = MaterialTheme.typography.headlineMedium, color = fg)
+                    IconText(
+                        t.handAndBooks(opp.handSize, opp.books.size),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = fg
+                    )
+                    if (opp.books.isNotEmpty()) {
+                        Spacer(Modifier.height(4.dp))
+                        BookChips(opp.books, chipColor = SunYellow)
+                    }
                 }
             }
         }
@@ -667,8 +810,6 @@ private fun BookChips(books: List<String>, chipColor: androidx.compose.ui.graphi
 @Composable
 private fun LogPanel(
     entries: List<LogEntry>,
-    myAvatar: AvatarChoice,
-    opponentAvatar: AvatarChoice,
     modifier: Modifier = Modifier
 ) {
     BubblePanel(modifier = modifier, background = Foam.copy(alpha = 0.92f)) {
@@ -689,13 +830,13 @@ private fun LogPanel(
                     style = TextStyle(fontSize = 12.sp)
                 )
             }
-            entries.forEach { entry -> LogRow(entry, myAvatar, opponentAvatar) }
+            entries.forEach { entry -> LogRow(entry) }
         }
     }
 }
 
 @Composable
-private fun LogRow(entry: LogEntry, myAvatar: AvatarChoice, opponentAvatar: AvatarChoice) {
+private fun LogRow(entry: LogEntry) {
     Row(
         modifier = Modifier.padding(vertical = 2.dp),
         verticalAlignment = Alignment.Top
@@ -703,7 +844,7 @@ private fun LogRow(entry: LogEntry, myAvatar: AvatarChoice, opponentAvatar: Avat
         when (entry) {
             is LogEntry.Action -> {
                 Avatar(
-                    choice      = if (entry.isMe) myAvatar else opponentAvatar,
+                    choice      = entry.avatar,
                     modifier    = Modifier
                         .padding(top = 1.dp)
                         .size(width = 30.dp, height = 22.dp),
@@ -763,14 +904,14 @@ private fun TurnStatusBar(
     myTurn: Boolean,
     gameOver: Boolean,
     winnerName: String,
-    opponentName: String
+    currentPlayerName: String
 ) {
     val t = LocalTexts.current
     val winnerDisplay = if (winnerName.equals(TIE_SENTINEL, ignoreCase = true)) t.drawWord else winnerName
     val (bg, fg, text) = when {
         gameOver -> Triple(SunYellow, DeepSea, t.turnGameOver(winnerDisplay))
         myTurn   -> Triple(SeafoamGreen, DeepSea, t.turnYou)
-        else     -> Triple(Lavender, DeepSea, t.turnWaiting(opponentName))
+        else     -> Triple(Lavender, DeepSea, t.turnWaiting(currentPlayerName))
     }
     BubblePanel(
         modifier = Modifier.fillMaxWidth(),
@@ -1038,7 +1179,6 @@ private fun styleFor(result: GameResult): ResultStyle = when (result) {
 @Composable
 private fun GameOverDialog(
     result: GameResult,
-    opponentName: String,
     onExit: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -1136,9 +1276,10 @@ private fun GameOverDialog(
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        ScoreCell(label = t.you,        count = result.myBooks)
-                        VerticalDivider()
-                        ScoreCell(label = opponentName, count = result.opBooks)
+                        result.standings.forEachIndexed { i, ps ->
+                            if (i > 0) VerticalDivider()
+                            ScoreCell(label = ps.name, count = ps.books)
+                        }
                     }
                 }
 

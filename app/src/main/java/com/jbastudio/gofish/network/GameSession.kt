@@ -19,7 +19,7 @@ interface GameSession {
     /** Anzeigename dieses Spielers (für Gewinner-Erkennung in der UI). */
     val playerName: String
 
-    /** Vom Server vergebene Spieler-ID (0 oder 1); -1 solange unbekannt. */
+    /** Vom Server vergebene Spieler-ID (0..3); -1 solange unbekannt. */
     val playerId: Int
 
     /** Eingehende Spielnachrichten (GAME_START, ASK_RESULT, OPPONENT_LEFT, …). */
@@ -31,8 +31,8 @@ interface GameSession {
     /** Verbindungs-/Übertragungsfehler (rohe Meldung). */
     var onError: ((String) -> Unit)?
 
-    /** Fragt den Gegner nach einem Rang. */
-    fun sendAsk(rank: String)
+    /** Fragt einen Gegner ([targetId]) nach einem Rang; ohne Ziel = einziger Gegner (2-Spieler). */
+    fun sendAsk(rank: String, targetId: Int? = null)
 
     /** Trennt die Verbindung / beendet die Sitzung. */
     fun disconnect()

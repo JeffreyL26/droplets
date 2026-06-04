@@ -102,6 +102,8 @@ class MainActivity : ComponentActivity() {
                 var soundMuted  by remember { mutableStateOf(GameSounds.muted) }
                 var musicVolume by remember { mutableStateOf(GameMusic.volume) }
                 var musicMuted  by remember { mutableStateOf(GameMusic.muted) }
+                // Gewünschte Gegnerzahl (1–3). Standard 1 = klassisches 2-Spieler-Spiel.
+                var opponentCount by remember { mutableStateOf(1) }
                 // Aktuelle Sprache (live umschaltbar über die Flaggen im Hauptmenü)
                 var lang by remember { mutableStateOf(langPrefs.load()) }
                 val T: Texts = textsFor(lang)
@@ -174,6 +176,7 @@ class MainActivity : ComponentActivity() {
                         findOnlineMatch(
                             relayUrl = url,
                             name     = finalName,
+                            desiredPlayers = opponentCount + 1,
                             token    = myToken,
                             texts    = T,
                             onUpdate = { s, err ->
@@ -206,7 +209,7 @@ class MainActivity : ComponentActivity() {
 
                 if (showSettingsDlg) {
                     SettingsDialog(
-                        version = "Pre-Launch PD040626.2",
+                        version = "Pre-Launch PD040626.5",
                         soundVolume = soundVolume,
                         soundMuted  = soundMuted,
                         onSoundVolumeChange = { v ->
@@ -261,7 +264,7 @@ class MainActivity : ComponentActivity() {
                       onNameChange  = { name = it },
                       avatar        = avatarChoice,
                       onAvatarClick = { showAvatarDlg = true },
-                      onFindGame    = startMatchmaking,
+                      onFindGame    = { goTo(Screen.ONLINE) },
                       onLocalHost   = { goTo(Screen.LOCAL) },
                       language      = lang,
                       onLanguageChange = { lang = it; langPrefs.save(it) },
@@ -273,6 +276,8 @@ class MainActivity : ComponentActivity() {
                       isError          = isError,
                       busy             = busy,
                       serverConfigured = serverOverride.ifBlank { DEFAULT_RELAY_URL }.isNotBlank(),
+                      opponentCount    = opponentCount,
+                      onOpponentCountChange = { opponentCount = it },
                       onBack           = backToMenu,
                       onCancel         = cancel,
                       onRetry          = startMatchmaking,
@@ -293,6 +298,8 @@ class MainActivity : ComponentActivity() {
                     onAvatarClick  = { showAvatarDlg = true },
                     onBack         = backToMenu,
                     onCancel       = cancel,
+                    opponentCount  = opponentCount,
+                    onOpponentCountChange = { opponentCount = it },
                     onHost = {
                         val finalName = name.trim().ifEmpty { T.defaultNameHost }
                         val myToken = ++attempt[0]
@@ -302,7 +309,7 @@ class MainActivity : ComponentActivity() {
                         status  = T.startingServer
                         // Server-Logs nur ins Logcat (nicht in die lokalisierte Status-Anzeige)
                         val server = GameServer().also { GameHolder.server = it }
-                        server.start()
+                        server.start(opponentCount + 1)   // Host zählt mit → Gesamtspielerzahl
                         connectAsClient(
                             host        = "127.0.0.1",
                             name        = finalName,
@@ -388,11 +395,17 @@ class MainActivity : ComponentActivity() {
         client.onConnected = { onUpdate(texts.connectedWaiting, false) }
         client.onError     = { err -> onUpdate(friendlyError(err, currentMode, texts), true) }
         client.onMessage   = { msg ->
-            if (msg.getString("type") == "GAME_START") {
-                GameHolder.gameStartMsg = msg
-                runOnUiThread {
-                    onSessionStart()
-                    startActivity(Intent(this, GameActivity::class.java))
+            when (msg.optString("type")) {
+                "GAME_START" -> {
+                    GameHolder.gameStartMsg = msg
+                    runOnUiThread {
+                        onSessionStart()
+                        startActivity(Intent(this, GameActivity::class.java))
+                    }
+                }
+                // Lobby-Fortschritt beim Warten auf weitere Spieler (3–4-Spieler-Host)
+                "LOBBY" -> runOnUiThread {
+                    onUpdate(texts.lobbyWaiting(msg.optInt("joined", 1), msg.optInt("expected", 2)), false)
                 }
             }
         }
@@ -409,12 +422,13 @@ class MainActivity : ComponentActivity() {
     private fun findOnlineMatch(
         relayUrl: String,
         name: String,
+        desiredPlayers: Int,
         token: Int,
         texts: Texts,
         onUpdate: (String, Boolean) -> Unit,
         onSessionStart: () -> Unit
     ) {
-        val client = OnlineGameClient(relayUrl, name, GameHolder.myAvatar)
+        val client = OnlineGameClient(relayUrl, name, GameHolder.myAvatar, desiredPlayers)
             .also { GameHolder.client = it }
         client.onConnected = { onUpdate(texts.opponentFound, false) }
         client.onError     = { err -> onUpdate(friendlyError(err, Mode.ONLINE, texts), true) }
@@ -432,6 +446,7 @@ class MainActivity : ComponentActivity() {
 
     /** Übersetzt rohe Socket-/IO-Meldungen in spielerfreundliche, lokalisierte Texte. */
     private fun friendlyError(raw: String, mode: Mode, t: Texts): String {
+        if (raw == OnlineGameClient.ERR_MULTI_UNSUPPORTED) return t.errOnlineMultiUnavailable
         val r = raw.lowercase()
         return when {
             r.contains("socket closed")
@@ -727,6 +742,8 @@ private fun OnlineScreen(
     isError: Boolean,
     busy: Boolean,
     serverConfigured: Boolean,
+    opponentCount: Int,
+    onOpponentCountChange: (Int) -> Unit,
     onBack: () -> Unit,
     onCancel: () -> Unit,
     onRetry: () -> Unit,
@@ -845,7 +862,12 @@ private fun OnlineScreen(
                 }
 
                 else -> {
-                    // Bereit (z. B. nach Abbruch / Fehler / Spielende) → erneut suchen
+                    // Erst Gegnerzahl wählen, dann suchen
+                    OpponentCountSelector(
+                        count = opponentCount,
+                        onCountChange = onOpponentCountChange
+                    )
+                    Spacer(Modifier.height(16.dp))
                     PastelButton(
                         text = t.findGameTitle,
                         emoji = "🔎",
@@ -1183,6 +1205,8 @@ private fun LobbyScreen(
     onAvatarClick: () -> Unit,
     onBack: () -> Unit,
     onCancel: () -> Unit,
+    opponentCount: Int,
+    onOpponentCountChange: (Int) -> Unit,
     onHost: () -> Unit,
     onJoin: () -> Unit
 ) {
@@ -1267,6 +1291,12 @@ private fun LobbyScreen(
                         t.yourIp(myIp.ifBlank { t.unknownIp }),
                         style = MaterialTheme.typography.bodyMedium,
                         color = SoftSeaText
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    OpponentCountSelector(
+                        count = opponentCount,
+                        onCountChange = onOpponentCountChange,
+                        enabled = !busy
                     )
                     Spacer(Modifier.height(12.dp))
                     PastelButton(
@@ -1362,6 +1392,52 @@ private fun SectionLabel(text: String) {
         style = MaterialTheme.typography.titleLarge,
         color = DeepSea
     )
+}
+
+/** Auswahl der Gegnerzahl (1–3) als drei antippbare Pillen. */
+@Composable
+private fun OpponentCountSelector(
+    count: Int,
+    onCountChange: (Int) -> Unit,
+    enabled: Boolean = true,
+    modifier: Modifier = Modifier
+) {
+    val t = LocalTexts.current
+    Column(modifier = modifier.fillMaxWidth()) {
+        Text(
+            t.opponentsLabel,
+            style = MaterialTheme.typography.titleMedium,
+            color = DeepSea
+        )
+        Spacer(Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            for (n in 1..3) {
+                val selected = n == count
+                Surface(
+                    onClick = { GameSounds.playClick(); onCountChange(n) },
+                    enabled = enabled,
+                    shape = RoundedCornerShape(14.dp),
+                    color = if (selected) SeafoamGreen else OceanTop.copy(alpha = 0.7f),
+                    contentColor = DeepSea,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "$n",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.SemiBold,
+                            color = DeepSea
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable

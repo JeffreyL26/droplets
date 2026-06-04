@@ -73,7 +73,7 @@ data class AnimationCue(
     val drawnCard: Card? = null,
     val nonce: Long = System.nanoTime()
 ) {
-    enum class Kind { GO_FISH, STEAL, BOOK }
+    enum class Kind { GO_FISH, STEAL, BOOK, GIVE }
 }
 
 @Composable
@@ -110,6 +110,7 @@ fun GameAnimationOverlay(cue: AnimationCue) {
                 AnimationCue.Kind.GO_FISH -> drawAnglerScene(cue, p, stage, measurer)
                 AnimationCue.Kind.STEAL   -> drawPovRodScene(cue, p, stage, measurer)
                 AnimationCue.Kind.BOOK    -> drawBookScene(cue, p, stage, measurer)
+                AnimationCue.Kind.GIVE    -> drawGiveScene(cue, p, stage, measurer)
             }
         }
 
@@ -139,6 +140,16 @@ fun GameAnimationOverlay(cue: AnimationCue) {
             AnimationCue.Kind.BOOK -> {
                 BookSplash(
                     rank     = cue.rank,
+                    progress = p,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .offset(y = 130.dp)
+                )
+            }
+            AnimationCue.Kind.GIVE -> {
+                GiveSplash(
+                    rank     = cue.rank,
+                    count    = cue.cards.size,
                     progress = p,
                     modifier = Modifier
                         .align(Alignment.Center)
@@ -463,6 +474,61 @@ private fun DrawScope.drawPovRodScene(cue: AnimationCue, p: Float, stage: Stage,
 
     // 5. POV-Rute im Vordergrund
     drawPovRod(rodHandle, rodTip, s)
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+//  Szene: Eigene Karten werden vom Gegner geangelt — sie fliegen nach oben weg
+// ─────────────────────────────────────────────────────────────────────────
+
+private fun DrawScope.drawGiveScene(cue: AnimationCue, p: Float, stage: Stage, measurer: TextMeasurer) {
+    val s = stage.unit() * 0.10f
+
+    // Start unten (eigene Hand), Ziel oben (Gegner-Panel)
+    val from = Offset(stage.x(0.5f), stage.y(1.04f))
+    val to   = Offset(stage.x(0.5f), stage.y(-0.06f))
+
+    val cards = cue.cards
+    val n = cards.size.coerceAtLeast(1)
+    val baseW = s * 1.4f
+    val baseH = baseW * 1.42f
+    val spread = baseW * 0.62f
+
+    cards.forEachIndexed { i, c ->
+        // leicht gestaffelter Start, damit mehrere Karten nacheinander wegziehen
+        val delay = i * 0.07f
+        val t = ((p - delay) / (1f - delay)).coerceIn(0f, 1f)
+        val eased = easeInOutCubic(t)
+
+        // Fächer am Start, der sich Richtung Gegner zusammenzieht
+        val ox = (i - (n - 1) / 2f) * spread * (1f - eased * 0.7f)
+        val cx = lerp(from.x, to.x, eased) + ox
+        val cy = lerp(from.y, to.y, eased)
+
+        val scale = lerp(1f, 0.5f, eased)            // schrumpft Richtung Gegner
+        val fadeIn  = (p / 0.08f).coerceIn(0f, 1f)
+        val fadeOut = if (t > 0.82f) (1f - (t - 0.82f) / 0.18f).coerceIn(0f, 1f) else 1f
+        val alpha = fadeIn * fadeOut
+        val rot = (i - (n - 1) / 2f) * 8f * (1f - eased) - eased * 12f
+
+        // Bewegungs-Trail hinter der Karte (Sog nach oben)
+        if (alpha > 0.2f && eased in 0.08f..0.92f) {
+            val tailY = lerp(from.y, to.y, (eased - 0.10f).coerceIn(0f, 1f))
+            drawLine(
+                color = Foam.copy(alpha = alpha * 0.22f),
+                start = Offset(cx, cy),
+                end   = Offset(cx, tailY),
+                strokeWidth = s * 0.05f,
+                cap = StrokeCap.Round
+            )
+        }
+
+        val cw = baseW * scale
+        val ch = baseH * scale
+        drawMiniCard(
+            Offset(cx - cw / 2f, cy - ch / 2f), Size(cw, ch),
+            c.rank, c.suit, measurer, alpha = alpha, rotation = rot
+        )
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -1217,6 +1283,64 @@ private fun StealSplash(
                 )
             )
         }
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+//  GIVE-SPLASH (eigene Karten werden geangelt — fliegen zum Gegner)
+// ═════════════════════════════════════════════════════════════════════════
+
+@Composable
+private fun GiveSplash(
+    rank: String,
+    count: Int,
+    progress: Float,
+    modifier: Modifier = Modifier
+) {
+    val p = progress
+    val popScale = when {
+        p < 0.15f -> easeOutBack(p / 0.15f)
+        p > 0.92f -> 1f - ((p - 0.92f) / 0.08f) * 0.15f
+        else      -> 1f
+    }
+    val splashAlpha = when {
+        p < 0.06f -> p / 0.06f
+        p > 0.92f -> ((1f - p) / 0.08f).coerceAtLeast(0f)
+        else      -> 1f
+    }
+
+    Column(
+        modifier = modifier.graphicsLayer(
+            scaleX    = popScale,
+            scaleY    = popScale,
+            rotationZ = -3f,
+            alpha     = splashAlpha
+        ),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        ComicTextBold(
+            text        = "$count×  $rank",
+            fontSize    = 56.sp,
+            fillColor   = Lavender,
+            strokeColor = SuitDark,
+            strokeWidth = 12f
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = LocalTexts.current.animGaveAway,
+            color = Foam,
+            style = TextStyle(
+                fontSize      = 22.sp,
+                fontWeight    = FontWeight.Black,
+                fontFamily    = FontFamily.SansSerif,
+                letterSpacing = 1.sp,
+                shadow = Shadow(
+                    color = DeepSea.copy(alpha = 0.85f),
+                    offset = Offset(3f, 5f),
+                    blurRadius = 8f
+                )
+            )
+        )
     }
 }
 

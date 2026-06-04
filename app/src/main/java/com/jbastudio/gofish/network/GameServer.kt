@@ -11,8 +11,8 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * LAN-Host: nimmt genau zwei Spieler über rohe TCP-Sockets (Port [Protocol.PORT])
- * entgegen und delegiert die gesamte Spiellogik an eine [GameAuthority].
+ * LAN-Host: nimmt bis zu vier Spieler über rohe TCP-Sockets (Port [Protocol.PORT])
+ * entgegen (Anzahl per [start]) und delegiert die gesamte Spiellogik an eine [GameAuthority].
  *
  * Der Server ist damit nur noch ein dünner Transport-Wrapper; die identische
  * Logik nutzt auch der Online-Host ([OnlineGameClient]) über das WebSocket-Relay.
@@ -32,13 +32,14 @@ class GameServer {
         authority.send  = { pid, msg -> writers[pid]?.println(msg.toString()) }
     }
 
-    fun start() {
+    fun start(expectedPlayers: Int = 2) {
+        authority.expectedPlayers = expectedPlayers
         Thread {
             try {
                 serverSocket = ServerSocket(Protocol.PORT)
-                log("Server läuft auf Port ${Protocol.PORT} …")
-                // Genau 2 Spieler akzeptieren
-                repeat(2) { serverSocket!!.accept().also { handleClient(it) } }
+                log("Server läuft auf Port ${Protocol.PORT} … (erwarte $expectedPlayers Spieler)")
+                // Bis zu vier Spieler akzeptieren (Anzahl vom Host vorgegeben)
+                repeat(expectedPlayers) { serverSocket!!.accept().also { handleClient(it) } }
             } catch (e: Exception) {
                 log("Server-Fehler: ${e.message}")
                 Log.e(TAG, "Server-Fehler", e)
