@@ -32,6 +32,8 @@ class SplashActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // Sounds früh laden, damit sie ab Spielbeginn bereitstehen.
+        GameSounds.init(this)
         setContent {
             SplashContent(
                 onFinished = {

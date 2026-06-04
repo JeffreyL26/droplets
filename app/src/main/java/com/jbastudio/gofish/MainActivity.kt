@@ -71,10 +71,14 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        GameSounds.init(this)
+        GameMusic.init(this)
         val myIp = localIpAddress()
         val avatarPrefs = AvatarPrefs(this)
         val netPrefs    = NetPrefs(this)
         val langPrefs   = LanguagePrefs(this)
+        val soundPrefs  = SoundPrefs(this)
+        val musicPrefs  = MusicPrefs(this)
         // Initialer Avatar aus Prefs in den Holder spielen
         GameHolder.myAvatar = avatarPrefs.load()
 
@@ -93,6 +97,11 @@ class MainActivity : ComponentActivity() {
                 var serverOverride by remember { mutableStateOf(netPrefs.loadRelayUrl()) }
                 var showServerDlg  by remember { mutableStateOf(false) }
                 var showSettingsDlg by remember { mutableStateOf(false) }
+                // Sound-Einstellungen (Quelle der Wahrheit ist GameSounds; hier nur gespiegelt)
+                var soundVolume by remember { mutableStateOf(GameSounds.volume) }
+                var soundMuted  by remember { mutableStateOf(GameSounds.muted) }
+                var musicVolume by remember { mutableStateOf(GameMusic.volume) }
+                var musicMuted  by remember { mutableStateOf(GameMusic.muted) }
                 // Aktuelle Sprache (live umschaltbar über die Flaggen im Hauptmenü)
                 var lang by remember { mutableStateOf(langPrefs.load()) }
                 val T: Texts = textsFor(lang)
@@ -198,6 +207,32 @@ class MainActivity : ComponentActivity() {
                 if (showSettingsDlg) {
                     SettingsDialog(
                         version = "Pre-Launch PD260526",
+                        soundVolume = soundVolume,
+                        soundMuted  = soundMuted,
+                        onSoundVolumeChange = { v ->
+                            soundVolume = v
+                            GameSounds.setVolume(v)
+                            soundPrefs.saveVolume(v)
+                        },
+                        onToggleSoundMute = {
+                            val newMuted = !soundMuted
+                            soundMuted = newMuted
+                            GameSounds.setMuted(newMuted)
+                            soundPrefs.saveMuted(newMuted)
+                        },
+                        musicVolume = musicVolume,
+                        musicMuted  = musicMuted,
+                        onMusicVolumeChange = { v ->
+                            musicVolume = v
+                            GameMusic.setVolume(v)
+                            musicPrefs.saveVolume(v)
+                        },
+                        onToggleMusicMute = {
+                            val newMuted = !musicMuted
+                            musicMuted = newMuted
+                            GameMusic.setMuted(newMuted)
+                            musicPrefs.saveMuted(newMuted)
+                        },
                         onClose = { showSettingsDlg = false }
                     )
                 }
@@ -326,6 +361,18 @@ class MainActivity : ComponentActivity() {
                 } // CompositionLocalProvider
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Menü im Vordergrund → Main-Theme (weiter)spielen.
+        GameMusic.resume()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // Menü verlassen (Spielstart oder App im Hintergrund) → Musik anhalten.
+        GameMusic.pause()
     }
 
     private fun connectAsClient(
@@ -596,7 +643,7 @@ private fun MainMenuScreen(
 private fun SettingsButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     val t = LocalTexts.current
     Surface(
-        onClick = onClick,
+        onClick = { GameSounds.playClick(); onClick() },
         modifier = modifier.size(44.dp),
         shape = CircleShape,
         color = Foam.copy(alpha = 0.85f),
@@ -655,7 +702,7 @@ private fun FlagButton(flagRes: Int, selected: Boolean, onClick: () -> Unit) {
                 shape = RoundedCornerShape(7.dp)
             )
             .alpha(if (selected) 1f else 0.55f)
-            .clickable { onClick() }
+            .clickable { GameSounds.playClick(); onClick() }
     )
 }
 
@@ -826,7 +873,7 @@ private fun OnlineScreen(
                     }
                     Spacer(Modifier.height(18.dp))
                     // Dezente Option (Tests / eigener Server)
-                    TextButton(onClick = onEditServer) {
+                    TextButton(onClick = { GameSounds.playClick(); onEditServer() }) {
                         Text(t.changeServer, color = SoftSeaText)
                     }
                 }
@@ -894,7 +941,7 @@ private fun ServerDialog(
                     onClick = { onSave(text) }
                 )
                 Spacer(Modifier.height(8.dp))
-                TextButton(onClick = onUseDefault) {
+                TextButton(onClick = { GameSounds.playClick(); onUseDefault() }) {
                     Text(t.useDefaultBtn, color = SoftSeaText)
                 }
             }
@@ -902,10 +949,18 @@ private fun ServerDialog(
     }
 }
 
-/** Einstellungen / Info: Version, Herausgeber und eine kleine Widmung. */
+/** Einstellungen / Info: Sound-Regler, Version, Herausgeber und eine kleine Widmung. */
 @Composable
 private fun SettingsDialog(
     version: String,
+    soundVolume: Float,
+    soundMuted: Boolean,
+    onSoundVolumeChange: (Float) -> Unit,
+    onToggleSoundMute: () -> Unit,
+    musicVolume: Float,
+    musicMuted: Boolean,
+    onMusicVolumeChange: (Float) -> Unit,
+    onToggleMusicMute: () -> Unit,
     onClose: () -> Unit
 ) {
     val t = LocalTexts.current
@@ -933,6 +988,24 @@ private fun SettingsDialog(
                     text = version,
                     style = MaterialTheme.typography.titleMedium,
                     color = DeepSea
+                )
+
+                Spacer(Modifier.height(22.dp))
+                SoundSetting(
+                    label          = t.soundLabel,
+                    volume         = soundVolume,
+                    muted          = soundMuted,
+                    onVolumeChange = onSoundVolumeChange,
+                    onToggleMute   = onToggleSoundMute
+                )
+
+                Spacer(Modifier.height(16.dp))
+                SoundSetting(
+                    label          = t.musicLabel,
+                    volume         = musicVolume,
+                    muted          = musicMuted,
+                    onVolumeChange = onMusicVolumeChange,
+                    onToggleMute   = onToggleMusicMute
                 )
 
                 Spacer(Modifier.height(18.dp))
@@ -965,6 +1038,68 @@ private fun SettingsDialog(
                     onClick = onClose
                 )
             }
+        }
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+//  Sound-Regler (eigenständig — Musik folgt später separat)
+// ═════════════════════════════════════════════════════════════════════════
+
+/**
+ * Eigenständiger Lautstärke-Regler für Soundeffekte: klassisches
+ * Lautsprecher-Symbol (Antippen = stumm/laut) + „Sound"-Titel + Schieberegler,
+ * der alle Effekte gemeinsam regelt. Bewusst in sich geschlossen, damit später
+ * ein analoger „Musik"-Regler danebengestellt werden kann.
+ */
+@Composable
+private fun SoundSetting(
+    label: String,
+    volume: Float,
+    muted: Boolean,
+    onVolumeChange: (Float) -> Unit,
+    onToggleMute: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Klassisches Sound-Symbol — Antippen schaltet alle Effekte stumm/laut
+        Surface(
+            onClick = onToggleMute,
+            shape = CircleShape,
+            color = OceanTop.copy(alpha = 0.6f),
+            contentColor = DeepSea,
+            modifier = Modifier.size(46.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                GameIcon(
+                    if (muted) GameIconKind.SPEAKER_MUTED else GameIconKind.SPEAKER,
+                    modifier = Modifier.size(26.dp),
+                    tint = DeepSea
+                )
+            }
+        }
+        Spacer(Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.titleMedium,
+                color = DeepSea
+            )
+            Slider(
+                value = volume,
+                onValueChange = onVolumeChange,
+                enabled = !muted,
+                colors = SliderDefaults.colors(
+                    thumbColor                 = SeafoamDeep,
+                    activeTrackColor           = SeafoamDeep,
+                    inactiveTrackColor         = OceanDeep.copy(alpha = 0.40f),
+                    disabledThumbColor         = OceanDeep.copy(alpha = 0.55f),
+                    disabledActiveTrackColor   = OceanDeep.copy(alpha = 0.30f),
+                    disabledInactiveTrackColor = OceanDeep.copy(alpha = 0.20f)
+                )
+            )
         }
     }
 }
@@ -1014,7 +1149,7 @@ private fun BackRow(text: String, enabled: Boolean, onBack: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Surface(
-            onClick = onBack,
+            onClick = { GameSounds.playClick(); onBack() },
             enabled = enabled,
             shape = RoundedCornerShape(16.dp),
             color = Foam.copy(alpha = 0.85f),
@@ -1273,7 +1408,7 @@ private fun PastelButton(
     onClick: () -> Unit
 ) {
     Button(
-        onClick = onClick,
+        onClick = { GameSounds.playClick(); onClick() },
         enabled = enabled,
         modifier = Modifier
             .fillMaxWidth()
@@ -1414,7 +1549,7 @@ private fun AvatarChooserRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
             .background(OceanTop.copy(alpha = 0.6f))
-            .clickable(enabled = enabled) { onClick() }
+            .clickable(enabled = enabled) { GameSounds.playClick(); onClick() }
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -1547,7 +1682,7 @@ private fun AvatarTile(
                 color = if (selected) SunDeep else OceanDeep.copy(alpha = 0.30f),
                 shape = RoundedCornerShape(16.dp)
             )
-            .clickable { onClick() }
+            .clickable { GameSounds.playClick(); onClick() }
             .padding(vertical = 10.dp, horizontal = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -1582,7 +1717,7 @@ private fun ColorSwatch(
                 color = if (selected) DeepSea else color.bodyDeep,
                 shape = CircleShape
             )
-            .clickable { onClick() },
+            .clickable { GameSounds.playClick(); onClick() },
         contentAlignment = Alignment.Center
     ) {
         if (selected) {

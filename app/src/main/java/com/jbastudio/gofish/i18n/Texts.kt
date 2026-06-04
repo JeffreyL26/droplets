@@ -56,6 +56,10 @@ interface Texts {
     // ── Einstellungen / Info ──
     val settingsTitle: String
     val publishedBy: String
+    /** Titel des Soundeffekt-Reglers. */
+    val soundLabel: String
+    /** Titel des Musik-Reglers (Hintergrundmusik, getrennt vom Soundeffekt-Regler). */
+    val musicLabel: String
 
     // ── Lokal-Bildschirm ──
     val localTitle: String
@@ -215,6 +219,8 @@ object DeTexts : Texts {
     override val backBtn = "Zurück"
     override val settingsTitle = "Einstellungen"
     override val publishedBy = "Herausgeber"
+    override val soundLabel = "Sound"
+    override val musicLabel = "Musik"
 
     override val localTitle = "Lokal spielen"
     override val localSubtitle = "Hosten oder im selben WLAN beitreten"
@@ -369,6 +375,8 @@ object EsTexts : Texts {
     override val backBtn = "Atrás"
     override val settingsTitle = "Ajustes"
     override val publishedBy = "Editor"
+    override val soundLabel = "Sound"
+    override val musicLabel = "Música"
 
     override val localTitle = "Juego local"
     override val localSubtitle = "Crea o únete en la misma red WiFi"
@@ -523,6 +531,8 @@ object EnTexts : Texts {
     override val backBtn = "Back"
     override val settingsTitle = "Settings"
     override val publishedBy = "Publisher"
+    override val soundLabel = "Sound"
+    override val musicLabel = "Music"
 
     override val localTitle = "Local play"
     override val localSubtitle = "Host or join on the same Wi-Fi"
@@ -677,6 +687,8 @@ object FrTexts : Texts {
     override val backBtn = "Retour"
     override val settingsTitle = "Paramètres"
     override val publishedBy = "Éditeur"
+    override val soundLabel = "Sound"
+    override val musicLabel = "Musique"
 
     override val localTitle = "Jeu local"
     override val localSubtitle = "Héberge ou rejoins sur le même Wi-Fi"
@@ -831,6 +843,8 @@ object ZhTexts : Texts {
     override val backBtn = "返回"
     override val settingsTitle = "设置"
     override val publishedBy = "发行方"
+    override val soundLabel = "Sound"
+    override val musicLabel = "音乐"
 
     override val localTitle = "本地游戏"
     override val localSubtitle = "在同一 Wi-Fi 下创建或加入"
@@ -984,6 +998,8 @@ object TlTexts : Texts {
     override val backBtn = "Bumalik"
     override val settingsTitle = "Mga setting"
     override val publishedBy = "Naglathala"
+    override val soundLabel = "Sound"
+    override val musicLabel = "Musika"
 
     override val localTitle = "Lokal na laro"
     override val localSubtitle = "Mag-host o sumali sa parehong Wi-Fi"

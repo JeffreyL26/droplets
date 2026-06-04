@@ -75,6 +75,7 @@ class GameActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        GameSounds.init(this)
 
         val client = GameHolder.client ?: run { finish(); return }
 
@@ -388,6 +389,14 @@ private fun GameScreen(state: GameUiState, onExit: () -> Unit, onAsk: (String) -
         try {
             while (true) {
                 state.overlayVisible = true
+                // Sound passend zur Animation. STEAL/GO_FISH/BOOK-Cues entstehen
+                // nur für eigene Aktionen (siehe handleAskResult), daher klingt
+                // jeder Effekt genau dann, wenn man selbst angelt bzw. ein Buch legt.
+                when (c.kind) {
+                    AnimationCue.Kind.GO_FISH -> GameSounds.playGoFish()
+                    AnimationCue.Kind.STEAL   -> GameSounds.playSteal(c.cards.size)
+                    AnimationCue.Kind.BOOK    -> GameSounds.playBook()
+                }
                 delay(ANIMATION_DURATION_MS)
                 state.overlayVisible = false
                 val candidateIds: Set<String> = when (c.kind) {
@@ -414,6 +423,11 @@ private fun GameScreen(state: GameUiState, onExit: () -> Unit, onAsk: (String) -
             state.overlayVisible = false
             state.highlightedCards = emptySet()
         }
+    }
+
+    // Sound: „Du bist dran" — spielt, sobald der eigene Zug (neu) beginnt.
+    LaunchedEffect(state.myTurn) {
+        if (state.myTurn) GameSounds.playTurn()
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -501,7 +515,10 @@ private fun GameScreen(state: GameUiState, onExit: () -> Unit, onAsk: (String) -
                     highlightedCards = state.highlightedCards,
                     highlightStolen  = state.highlightFromSteal,
                     enabled          = state.myTurn && !state.overlayVisible,
-                    onSelect         = { rank -> state.selectedRank = rank }
+                    onSelect         = { rank ->
+                        GameSounds.playCardSelect()
+                        state.selectedRank = rank
+                    }
                 )
 
                 Spacer(Modifier.height(10.dp))
@@ -858,7 +875,7 @@ private fun AskButton(
         exit  = fadeOut()
     ) {
         Button(
-            onClick = onAsk,
+            onClick = { GameSounds.playClick(); onAsk() },
             enabled = enabled,
             modifier = Modifier
                 .fillMaxWidth()
@@ -889,7 +906,7 @@ private fun AskButton(
 @Composable
 private fun ExitButton(onClick: () -> Unit) {
     FilledIconButton(
-        onClick = onClick,
+        onClick = { GameSounds.playClick(); onClick() },
         modifier = Modifier.size(40.dp),
         shape = RoundedCornerShape(20.dp),
         colors = IconButtonDefaults.filledIconButtonColors(
@@ -926,7 +943,7 @@ private fun ExitConfirmDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
         },
         confirmButton = {
             Button(
-                onClick = onConfirm,
+                onClick = { GameSounds.playClick(); onConfirm() },
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = CoralDeep,
@@ -938,7 +955,7 @@ private fun ExitConfirmDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
         },
         dismissButton = {
             TextButton(
-                onClick = onDismiss,
+                onClick = { GameSounds.playClick(); onDismiss() },
                 colors = ButtonDefaults.textButtonColors(contentColor = DeepSea)
             ) {
                 Text(t.stayBtn, fontWeight = FontWeight.SemiBold)
@@ -972,7 +989,7 @@ private fun SessionEndedDialog(message: String, onConfirm: () -> Unit) {
         },
         confirmButton = {
             Button(
-                onClick = onConfirm,
+                onClick = { GameSounds.playClick(); onConfirm() },
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = SeafoamDeep,
@@ -1027,6 +1044,15 @@ private fun GameOverDialog(
         is GameResult.Win  -> t.winTitle
         is GameResult.Lose -> t.loseTitle
         is GameResult.Tie  -> t.tieTitle
+    }
+
+    // Ergebnis-Jingle exakt beim Erscheinen des Popups (Unentschieden bleibt still).
+    LaunchedEffect(Unit) {
+        when (result) {
+            is GameResult.Win  -> GameSounds.playWinner()
+            is GameResult.Lose -> GameSounds.playLoser()
+            is GameResult.Tie  -> {}
+        }
     }
 
     Dialog(
@@ -1115,7 +1141,7 @@ private fun GameOverDialog(
                 Spacer(Modifier.height(22.dp))
 
                 Button(
-                    onClick = onExit,
+                    onClick = { GameSounds.playClick(); onExit() },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),

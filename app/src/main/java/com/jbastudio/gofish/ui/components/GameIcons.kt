@@ -26,7 +26,7 @@ import kotlin.math.sin
 enum class GameIconKind {
     GLOBE, HOME, ROD, WAVE, FISH, SATELLITE, HAND, SEARCH, PENCIL, CHECK, CLOSE,
     DECK, CARD, BOOKS, BOOKS_CLASSIC, SCROLL, ARROW_UP, ARROW_LEFT, HOURGLASS, TROPHY, HOOK, HANDSHAKE,
-    CLAPPER, FLAG_CHECKERED
+    CLAPPER, FLAG_CHECKERED, SPEAKER, SPEAKER_MUTED
 }
 
 @Composable
@@ -68,6 +68,8 @@ private fun DrawScope.drawGameIcon(kind: GameIconKind, c: Color) {
         GameIconKind.HANDSHAKE      -> drawHandshake(c, colored)
         GameIconKind.CLAPPER        -> drawClapper(c, colored)
         GameIconKind.FLAG_CHECKERED -> drawCheckeredFlag(c, colored)
+        GameIconKind.SPEAKER        -> drawSpeaker(c, colored, muted = false)
+        GameIconKind.SPEAKER_MUTED  -> drawSpeaker(c, colored, muted = true)
     }
 }
 
@@ -540,6 +542,50 @@ private fun DrawScope.drawCheckeredFlag(c: Color, colored: Boolean) {
     for (r in 0 until rows) for (col in 0 until cols) {
         if ((r + col) % 2 == 0) {
             drawRect(c, topLeft = Offset(fx + col * cw, fy + r * ch), size = Size(cw, ch))
+        }
+    }
+}
+
+/**
+ * Klassisches Lautsprecher-Symbol. Ohne [muted] mit zwei nach rechts
+ * abstrahlenden Schallwellen, mit [muted] stattdessen einem deutlichen Kreuz
+ * (Stumm).
+ */
+private fun DrawScope.drawSpeaker(c: Color, colored: Boolean, muted: Boolean) {
+    val w = size.width; val h = size.height; val s = sw()
+    val cy = h * 0.5f
+    // Korpus: Box + Konus als eine gefüllte Silhouette
+    val body = Path().apply {
+        moveTo(w * 0.44f, h * 0.22f)
+        lineTo(w * 0.26f, h * 0.40f)
+        lineTo(w * 0.12f, h * 0.40f)
+        lineTo(w * 0.12f, h * 0.60f)
+        lineTo(w * 0.26f, h * 0.60f)
+        lineTo(w * 0.44f, h * 0.78f)
+        close()
+    }
+    drawPath(body, c)
+    if (muted) {
+        // Stumm-Kreuz rechts neben dem Lautsprecher (rötlich, wenn farbig)
+        val x0 = w * 0.56f; val x1 = w * 0.82f
+        val yt = cy - h * 0.13f; val yb = cy + h * 0.13f
+        val cross = if (colored) CoralDeep else c
+        line(Offset(x0, yt), Offset(x1, yb), cross, s * 1.15f)
+        line(Offset(x1, yt), Offset(x0, yb), cross, s * 1.15f)
+    } else {
+        // Zwei Schallwellen (Kreisbögen), zentriert an der Konusöffnung
+        val waveCol = if (colored) SeafoamDeep else c
+        listOf(0.15f, 0.25f).forEach { rf ->
+            val r = size.minDimension * rf
+            drawArc(
+                color = waveCol,
+                startAngle = -50f,
+                sweepAngle = 100f,
+                useCenter = false,
+                topLeft = Offset(w * 0.44f - r, cy - r),
+                size = Size(r * 2f, r * 2f),
+                style = Stroke(width = s * 0.9f, cap = StrokeCap.Round)
+            )
         }
     }
 }
