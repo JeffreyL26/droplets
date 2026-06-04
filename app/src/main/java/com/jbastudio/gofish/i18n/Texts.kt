@@ -135,6 +135,8 @@ interface Texts {
     val deckEmpty: String
     fun oppAskedGot(rank: String, n: Int): String
     fun oppAskedGoFish(rank: String, wentFishing: Boolean): String
+    /** Gegner zog beim Angeln die gesuchte Karte und ist erneut am Zug. */
+    fun oppDrawnHit(rank: String): String
     fun youBook(rank: String): String
     fun oppBook(rank: String): String
     val gameOverLog: String
@@ -294,6 +296,7 @@ object DeTexts : Texts {
     override fun oppAskedGot(rank: String, n: Int) = "fragte nach $rank → nimmt $n Karte(n) von dir."
     override fun oppAskedGoFish(rank: String, wentFishing: Boolean) =
         "fragte nach $rank → Go Fish!" + if (wentFishing) " Zieht eine Karte." else ""
+    override fun oppDrawnHit(rank: String) = "   ↳ Gezogen: $rank  ✓ Treffer — nochmal dran."
     override fun youBook(rank: String) = "hast ein ${rank}er-Buch abgelegt!"
     override fun oppBook(rank: String) = "hat ein ${rank}er-Buch abgelegt!"
     override val gameOverLog = "🏁 Spiel beendet."
@@ -450,6 +453,7 @@ object EsTexts : Texts {
     override fun oppAskedGot(rank: String, n: Int) = "pidió $rank → te quita $n carta(s)."
     override fun oppAskedGoFish(rank: String, wentFishing: Boolean) =
         "pidió $rank → ¡Go Fish!" + if (wentFishing) " Roba una carta." else ""
+    override fun oppDrawnHit(rank: String) = "   ↳ Robada: $rank  ✓ ¡Acierto — turno extra!"
     override fun youBook(rank: String) = "¡completaste un cuarteto de $rank!"
     override fun oppBook(rank: String) = "¡completó un cuarteto de $rank!"
     override val gameOverLog = "🏁 Partida terminada."
@@ -606,6 +610,7 @@ object EnTexts : Texts {
     override fun oppAskedGot(rank: String, n: Int) = "asked for $rank → takes $n card(s) from you."
     override fun oppAskedGoFish(rank: String, wentFishing: Boolean) =
         "asked for $rank → Go Fish!" + if (wentFishing) " Draws a card." else ""
+    override fun oppDrawnHit(rank: String) = "   ↳ Drawn: $rank  ✓ Match — goes again."
     override fun youBook(rank: String) = "completed a book of ${rank}s!"
     override fun oppBook(rank: String) = "completed a book of ${rank}s!"
     override val gameOverLog = "🏁 Game over."
@@ -762,6 +767,7 @@ object FrTexts : Texts {
     override fun oppAskedGot(rank: String, n: Int) = "a demandé $rank → te prend $n carte(s)."
     override fun oppAskedGoFish(rank: String, wentFishing: Boolean) =
         "a demandé $rank → Go Fish !" + if (wentFishing) " Pioche une carte." else ""
+    override fun oppDrawnHit(rank: String) = "   ↳ Pioché : $rank  ✓ Réussi — rejoue."
     override fun youBook(rank: String) = "as complété un carré de $rank !"
     override fun oppBook(rank: String) = "a complété un carré de $rank !"
     override val gameOverLog = "🏁 Partie terminée."
@@ -917,6 +923,7 @@ object ZhTexts : Texts {
     override fun oppAskedGot(rank: String, n: Int) = "要了 $rank → 从你这里拿走 $n 张牌。"
     override fun oppAskedGoFish(rank: String, wentFishing: Boolean) =
         "要了 $rank → Go Fish！" + if (wentFishing) " 抽一张牌。" else ""
+    override fun oppDrawnHit(rank: String) = "   ↳ 抽到：$rank  ✓ 命中 — 再来一次。"
     override fun youBook(rank: String) = "凑齐了一组 $rank！"
     override fun oppBook(rank: String) = "凑齐了一组 $rank！"
     override val gameOverLog = "🏁 游戏结束。"
@@ -1073,6 +1080,7 @@ object TlTexts : Texts {
     override fun oppAskedGot(rank: String, n: Int) = "humingi ng $rank → kinuha ang $n kard mo."
     override fun oppAskedGoFish(rank: String, wentFishing: Boolean) =
         "humingi ng $rank → Go Fish!" + if (wentFishing) " Kumuha ng isang kard." else ""
+    override fun oppDrawnHit(rank: String) = "   ↳ Kinuha: $rank  ✓ Tama — ulit siya."
     override fun youBook(rank: String) = "nakakumpleto ng set ng $rank!"
     override fun oppBook(rank: String) = "nakakumpleto ng set ng $rank!"
     override val gameOverLog = "🏁 Tapos na ang laro."

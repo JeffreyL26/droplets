@@ -219,6 +219,10 @@ class GameActivity : ComponentActivity() {
             } else {
                 state.appendAction(isMe = false, name = state.opponentName,
                     text = T.oppAskedGoFish(rank, wentFish))
+                // Gegner hat beim Angeln die gesuchte Karte gezogen → ist nochmal dran.
+                if (msg.optBoolean("drawnMatched", false)) {
+                    state.appendSystem(T.oppDrawnHit(rank))
+                }
             }
         }
         for (b in newBooks) {

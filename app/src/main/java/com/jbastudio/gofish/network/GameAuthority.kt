@@ -127,6 +127,9 @@ class GameAuthority {
             put("gotCards", r.cardsReceived.isNotEmpty())
             put("cardCount", r.cardsReceived.size)
             put("wentFishing", r.wentFishing)
+            // Hat der Fragende beim Angeln die gesuchte Karte gezogen? Dann ist er
+            // erneut dran — der Gegner soll das ebenfalls im Log sehen.
+            put("drawnMatched", r.drawnCardMatchesRank)
             put("newBooks", JSONArray(r.newBooksForAsker))
             put("yourHand", cardsToJson(target.hand))
             put("yourBooks", JSONArray(target.books))
