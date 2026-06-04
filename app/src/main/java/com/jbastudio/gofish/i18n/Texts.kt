@@ -221,7 +221,7 @@ object DeTexts : Texts {
     override val backBtn = "Zurück"
     override val settingsTitle = "Einstellungen"
     override val publishedBy = "Herausgeber"
-    override val soundLabel = "Sound"
+    override val soundLabel = "Ton"
     override val musicLabel = "Musik"
 
     override val localTitle = "Lokal spielen"
@@ -378,7 +378,7 @@ object EsTexts : Texts {
     override val backBtn = "Atrás"
     override val settingsTitle = "Ajustes"
     override val publishedBy = "Editor"
-    override val soundLabel = "Sound"
+    override val soundLabel = "Sonido"
     override val musicLabel = "Música"
 
     override val localTitle = "Juego local"
@@ -692,7 +692,7 @@ object FrTexts : Texts {
     override val backBtn = "Retour"
     override val settingsTitle = "Paramètres"
     override val publishedBy = "Éditeur"
-    override val soundLabel = "Sound"
+    override val soundLabel = "Son"
     override val musicLabel = "Musique"
 
     override val localTitle = "Jeu local"
@@ -849,7 +849,7 @@ object ZhTexts : Texts {
     override val backBtn = "返回"
     override val settingsTitle = "设置"
     override val publishedBy = "发行方"
-    override val soundLabel = "Sound"
+    override val soundLabel = "音效"
     override val musicLabel = "音乐"
 
     override val localTitle = "本地游戏"
@@ -1005,7 +1005,7 @@ object TlTexts : Texts {
     override val backBtn = "Bumalik"
     override val settingsTitle = "Mga setting"
     override val publishedBy = "Naglathala"
-    override val soundLabel = "Sound"
+    override val soundLabel = "Tunog"
     override val musicLabel = "Musika"
 
     override val localTitle = "Lokal na laro"

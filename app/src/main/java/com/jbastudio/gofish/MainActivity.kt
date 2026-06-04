@@ -206,7 +206,7 @@ class MainActivity : ComponentActivity() {
 
                 if (showSettingsDlg) {
                     SettingsDialog(
-                        version = "Pre-Launch PD040626.1",
+                        version = "Pre-Launch PD040626.2",
                         soundVolume = soundVolume,
                         soundMuted  = soundMuted,
                         onSoundVolumeChange = { v ->
