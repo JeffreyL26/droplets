@@ -14,6 +14,7 @@ dependencies {
     implementation("io.ktor:ktor-server-netty:$ktorVersion")
     implementation("io.ktor:ktor-server-websockets:$ktorVersion")
     implementation("ch.qos.logback:logback-classic:1.5.6")
+    implementation("org.json:json:20240303")
 }
 
 application {
