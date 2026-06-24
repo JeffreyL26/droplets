@@ -44,9 +44,12 @@ import com.jbastudio.gofish.i18n.Language
 import com.jbastudio.gofish.i18n.LocalTexts
 import com.jbastudio.gofish.i18n.Texts
 import com.jbastudio.gofish.i18n.textsFor
+import com.jbastudio.gofish.ads.AdManager
 import com.jbastudio.gofish.network.GameClient
 import com.jbastudio.gofish.network.GameServer
 import com.jbastudio.gofish.network.OnlineGameClient
+import com.jbastudio.gofish.store.BillingManager
+import com.jbastudio.gofish.store.StoreManager
 import com.jbastudio.gofish.ui.components.Avatar
 import com.jbastudio.gofish.ui.components.AvatarChoice
 import com.jbastudio.gofish.ui.components.AvatarColor
@@ -69,11 +72,22 @@ class MainActivity : ComponentActivity() {
     /** Welcher Bildschirm gerade sichtbar ist. */
     enum class Screen { MENU, LOCAL, ONLINE }
 
+    /** Google Play Billing — Lebenszyklus an die Activity gekoppelt. */
+    private lateinit var billingManager: BillingManager
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (::billingManager.isInitialized) billingManager.destroy()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         GameSounds.init(this)
         GameMusic.init(this)
+        StoreManager.init(this)
+        AdManager.init(this)
+        billingManager = BillingManager(this)
         val myIp = localIpAddress()
         val avatarPrefs = AvatarPrefs(this)
         val netPrefs    = NetPrefs(this)
@@ -100,6 +114,7 @@ class MainActivity : ComponentActivity() {
                 var serverOverride by remember { mutableStateOf(netPrefs.loadRelayUrl()) }
                 var showServerDlg  by remember { mutableStateOf(false) }
                 var showSettingsDlg by remember { mutableStateOf(false) }
+                var showDevDlg      by remember { mutableStateOf(false) }
                 // Sound-Einstellungen (Quelle der Wahrheit ist GameSounds; hier nur gespiegelt)
                 var soundVolume by remember { mutableStateOf(GameSounds.volume) }
                 var soundMuted  by remember { mutableStateOf(GameSounds.muted) }
@@ -209,6 +224,19 @@ class MainActivity : ComponentActivity() {
                             avatarPrefs.save(newChoice)
                             GameHolder.myAvatar = newChoice
                         },
+                        onWatchAd = { kind ->
+                            AdManager.showRewarded(
+                                this@MainActivity,
+                                onRewarded = { StoreManager.unlockByAd(kind) },
+                                onComplete = {}
+                            )
+                        },
+                        onBuy = { kind ->
+                            billingManager.launchPurchaseFlow(
+                                this@MainActivity,
+                                BillingManager.skinSku(kind)
+                            ) { _, _ -> /* Erfolg → StoreManager wird in BillingManager aktualisiert */ }
+                        },
                         onClose = { showAvatarDlg = false }
                     )
                 }
@@ -242,8 +270,19 @@ class MainActivity : ComponentActivity() {
                             GameMusic.setMuted(newMuted)
                             musicPrefs.saveMuted(newMuted)
                         },
+                        onBuyAdFree = {
+                            billingManager.launchPurchaseFlow(
+                                this@MainActivity,
+                                BillingManager.AD_FREE_SKU
+                            ) { _, _ -> /* Erfolg → StoreManager.setAdFree in BillingManager */ }
+                        },
+                        onShowDevOptions = { showDevDlg = true },
                         onClose = { showSettingsDlg = false }
                     )
+                }
+
+                if (showDevDlg) {
+                    DevOptionsDialog(onClose = { showDevDlg = false })
                 }
 
                 if (showServerDlg) {
@@ -1012,6 +1051,8 @@ private fun SettingsDialog(
     musicMuted: Boolean,
     onMusicVolumeChange: (Float) -> Unit,
     onToggleMusicMute: () -> Unit,
+    onBuyAdFree: () -> Unit,
+    onShowDevOptions: () -> Unit,
     onClose: () -> Unit
 ) {
     val t = LocalTexts.current
@@ -1079,6 +1120,36 @@ private fun SettingsDialog(
                     style = MaterialTheme.typography.titleMedium.copy(fontStyle = FontStyle.Italic),
                     color = CoralDeep
                 )
+
+                // ── Werbefrei (IAP) ──
+                Spacer(Modifier.height(18.dp))
+                if (StoreManager.isAdFree) {
+                    Text(
+                        t.adFreeActive,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = SeafoamDeep
+                    )
+                } else {
+                    PastelButton(
+                        text = t.adFreeBtn,
+                        emoji = "💎",
+                        enabled = true,
+                        container = SunYellow,
+                        onClick = onBuyAdFree
+                    )
+                }
+
+                // Dev-Options — nur im Debug-Build sichtbar
+                if (BuildConfig.DEBUG) {
+                    Spacer(Modifier.height(12.dp))
+                    TextButton(onClick = { GameSounds.playClick(); onShowDevOptions() }) {
+                        Text(
+                            "🛠 Dev Options",
+                            color = SoftSeaText,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
 
                 Spacer(Modifier.height(22.dp))
                 PastelButton(
@@ -1717,6 +1788,8 @@ private fun AvatarChooserRow(
 private fun AvatarSelectionDialog(
     currentChoice: AvatarChoice,
     onChoiceChange: (AvatarChoice) -> Unit,
+    onWatchAd: (AvatarKind) -> Unit,
+    onBuy: (AvatarKind) -> Unit,
     onClose: () -> Unit
 ) {
     val t = LocalTexts.current
@@ -1756,11 +1829,13 @@ private fun AvatarSelectionDialog(
                         for (colIdx in 0..2) {
                             val idx = rowIdx * 3 + colIdx
                             AvatarTile(
-                                kind     = kinds[idx],
-                                color    = currentChoice.color,
-                                selected = currentChoice.kind == kinds[idx],
-                                onClick  = { onChoiceChange(currentChoice.copy(kind = kinds[idx])) },
-                                modifier = Modifier.weight(1f)
+                                kind      = kinds[idx],
+                                color     = currentChoice.color,
+                                selected  = currentChoice.kind == kinds[idx],
+                                onSelect  = { onChoiceChange(currentChoice.copy(kind = kinds[idx])) },
+                                onWatchAd = { onWatchAd(kinds[idx]) },
+                                onBuy     = { onBuy(kinds[idx]) },
+                                modifier  = Modifier.weight(1f)
                             )
                         }
                     }
@@ -1803,38 +1878,128 @@ private fun AvatarTile(
     kind: AvatarKind,
     color: AvatarColor,
     selected: Boolean,
-    onClick: () -> Unit,
+    onSelect: () -> Unit,          // nur aufgerufen, wenn freigeschaltet
+    onWatchAd: () -> Unit,         // Rewarded-Ad-Unlock
+    onBuy: () -> Unit,             // IAP-Unlock
     modifier: Modifier = Modifier
 ) {
     val t = LocalTexts.current
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(
-                if (selected) SunYellow.copy(alpha = 0.45f)
-                else          OceanTop.copy(alpha = 0.55f)
+    val unlocked = StoreManager.isUnlocked(kind)   // beobachtbar → recomposed nach Unlock
+
+    Box(modifier = modifier) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(
+                    when {
+                        selected  -> SunYellow.copy(alpha = 0.45f)
+                        !unlocked -> OceanTop.copy(alpha = 0.25f)   // dunkler, wenn gesperrt
+                        else      -> OceanTop.copy(alpha = 0.55f)
+                    }
+                )
+                .border(
+                    width = if (selected) 3.dp else 1.dp,
+                    color = if (selected) SunDeep else OceanDeep.copy(alpha = 0.30f),
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .clickable(enabled = unlocked) { GameSounds.playClick(); onSelect() }
+                .padding(vertical = 10.dp, horizontal = 6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Avatar(
+                choice      = AvatarChoice(kind, color),
+                modifier    = Modifier
+                    .size(width = 80.dp, height = 60.dp)
+                    .alpha(if (unlocked) 1f else 0.35f),
+                facingRight = true,
+                animated    = selected && unlocked
             )
-            .border(
-                width = if (selected) 3.dp else 1.dp,
-                color = if (selected) SunDeep else OceanDeep.copy(alpha = 0.30f),
-                shape = RoundedCornerShape(16.dp)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text  = t.kindName(kind),
+                color = if (unlocked) DeepSea else SoftSeaText,
+                style = MaterialTheme.typography.labelMedium
             )
-            .clickable { GameSounds.playClick(); onClick() }
-            .padding(vertical = 10.dp, horizontal = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+        }
+
+        // Lock-Badge + Unlock-Buttons (nur wenn gesperrt)
+        if (!unlocked) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                // 🎬 — Rewarded-Ad (nur wenn eine Anzeige bereit ist)
+                if (AdManager.isRewardedReady()) {
+                    SmallUnlockButton("🎬") { GameSounds.playClick(); onWatchAd() }
+                }
+                // 💎 — Kauf (IAP)
+                SmallUnlockButton("💎") { GameSounds.playClick(); onBuy() }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SmallUnlockButton(label: String, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(DeepSea.copy(alpha = 0.75f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Avatar(
-            choice      = AvatarChoice(kind, color),
-            modifier    = Modifier.size(width = 80.dp, height = 60.dp),
-            facingRight = true,
-            animated    = selected
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text  = t.kindName(kind),
-            color = DeepSea,
-            style = MaterialTheme.typography.labelMedium
-        )
+        Text(label, style = MaterialTheme.typography.labelSmall, color = Foam)
+    }
+}
+
+/** Entwickler-Optionen — nur im Debug-Build erreichbar (Strings bewusst nicht lokalisiert). */
+@Composable
+private fun DevOptionsDialog(onClose: () -> Unit) {
+    Dialog(
+        onDismissRequest = onClose,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        BubblePanel(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+            background = Foam,
+            cornerRadius = 28.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text("🛠 Dev Options", style = MaterialTheme.typography.headlineLarge, color = DeepSea)
+                Text(
+                    "Nur im Debug-Build sichtbar",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = SoftSeaText
+                )
+                Spacer(Modifier.height(8.dp))
+
+                PastelButton(text = "Alle Skins freischalten", emoji = "🔓", enabled = true, container = SeafoamGreen) {
+                    GameSounds.playClick(); StoreManager.devUnlockAll(); onClose()
+                }
+                PastelButton(text = "Ad-Free aktivieren", emoji = "🚫", enabled = true, container = SunYellow) {
+                    GameSounds.playClick(); StoreManager.setAdFree(true); onClose()
+                }
+                PastelButton(text = "Alles zurücksetzen", emoji = "🔄", enabled = true, container = CoralPink) {
+                    GameSounds.playClick(); StoreManager.devResetAll(); onClose()
+                }
+                TextButton(onClick = { GameSounds.playClick(); onClose() }) {
+                    Text("Schließen", color = SoftSeaText)
+                }
+            }
+        }
     }
 }
 

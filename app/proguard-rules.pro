@@ -19,3 +19,13 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# ── Monetarisierung ───────────────────────────────────────────────────────
+# Greift erst bei isMinifyEnabled = true (aktuell false), aber vorab hinterlegt.
+
+# Google Play Billing
+-keep class com.android.billingclient.** { *; }
+
+# AdMob / Google Mobile Ads
+-keep class com.google.android.gms.ads.** { *; }
+-dontwarn com.google.android.gms.ads.**

@@ -36,6 +36,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true   // für BuildConfig.DEBUG (Dev-Options nur im Debug-Build)
     }
 }
 
@@ -49,6 +50,9 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.okhttp)
+    // Monetarisierung
+    implementation(libs.billing.ktx)          // Google Play Billing (IAP)
+    implementation(libs.play.services.ads)    // AdMob (Google Mobile Ads SDK)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

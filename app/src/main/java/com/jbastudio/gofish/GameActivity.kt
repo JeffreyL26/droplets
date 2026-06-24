@@ -40,6 +40,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.jbastudio.gofish.ads.AdManager
 import com.jbastudio.gofish.i18n.LocalTexts
 import com.jbastudio.gofish.i18n.Texts
 import com.jbastudio.gofish.i18n.textsFor
@@ -102,6 +103,10 @@ class GameActivity : ComponentActivity() {
                     GameScreen(
                         state  = state,
                         onExit = { finish() },
+                        onExitToMenu = {
+                            // Nur am „Zum Hauptmenü"-Button: ggf. Interstitial, dann beenden.
+                            AdManager.showInterstitialIfEligible(this@GameActivity) { finish() }
+                        },
                         onAsk  = { attemptAsk() }
                     )
                 }
@@ -440,7 +445,7 @@ sealed class LogEntry {
 // ─────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun GameScreen(state: GameUiState, onExit: () -> Unit, onAsk: () -> Unit) {
+private fun GameScreen(state: GameUiState, onExit: () -> Unit, onExitToMenu: () -> Unit, onAsk: () -> Unit) {
     var showExitDialog by remember { mutableStateOf(false) }
     val sessionEnded = state.sessionEndedMessage
     val gameResult   = state.gameResult
@@ -464,7 +469,7 @@ private fun GameScreen(state: GameUiState, onExit: () -> Unit, onAsk: () -> Unit
     if (gameResult != null && sessionEnded == null) {
         GameOverDialog(
             result    = gameResult,
-            onExit    = onExit,
+            onExit    = onExitToMenu,
             onDismiss = { state.gameResult = null }
         )
     }

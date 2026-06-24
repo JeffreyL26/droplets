@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import com.jbastudio.gofish.store.AvatarSkinTier
 import com.jbastudio.gofish.ui.theme.*
 import kotlin.math.cos
 import kotlin.math.min
@@ -27,13 +28,17 @@ import kotlin.math.sin
 //  Modell
 // ─────────────────────────────────────────────────────────────────────────
 
-enum class AvatarKind(val displayName: String, val emoji: String) {
-    FISH    ("Fisch",        "🐟"),
-    SHARK   ("Hai",          "🦈"),
-    WHALE   ("Wal",          "🐳"),
-    DOLPHIN ("Delfin",       "🐬"),
-    PUFFER  ("Kugelfisch",   "🐡"),
-    STARFISH("Seestern",     "⭐")
+enum class AvatarKind(
+    val displayName: String,
+    val emoji: String,
+    val defaultTier: AvatarSkinTier
+) {
+    FISH    ("Fisch",        "🐟", AvatarSkinTier.FREE),
+    SHARK   ("Hai",          "🦈", AvatarSkinTier.FREE),
+    WHALE   ("Wal",          "🐳", AvatarSkinTier.LOCKED),
+    DOLPHIN ("Delfin",       "🐬", AvatarSkinTier.LOCKED),
+    PUFFER  ("Kugelfisch",   "🐡", AvatarSkinTier.LOCKED),
+    STARFISH("Seestern",     "⭐", AvatarSkinTier.LOCKED)
 }
 
 enum class AvatarColor(

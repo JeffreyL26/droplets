@@ -90,6 +90,11 @@ interface Texts {
     val findGameTitle: String
     val anyGame: String          // „Beliebiges Spiel" — Standard-Button (any-Match)
     val orPickCount: String      // Hinweis über der festen Gegnerzahl-Auswahl
+    // ── Store / Monetarisierung ──
+    val adFreeBtn: String        // „Werbefrei spielen"-Button
+    val adFreeActive: String     // Status, wenn Ad-Free gekauft
+    val watchAdUnlock: String    // Rewarded-Video-Unlock eines Skins
+    val buyUnlock: String        // IAP-Unlock eines Skins
     val onlineSubtitle: String
     val searchingOpponent: String
     val waitingForPlayer: String
@@ -268,6 +273,10 @@ object DeTexts : Texts {
     override val findGameTitle = "Spiel finden"
     override val anyGame = "Beliebiges Spiel"
     override val orPickCount = "… oder feste Gegnerzahl wählen"
+    override val adFreeBtn = "Werbefrei spielen"
+    override val adFreeActive = "✅ Werbefrei"
+    override val watchAdUnlock = "Video ansehen"
+    override val buyUnlock = "Kaufen"
     override val onlineSubtitle = "Automatisch mit einem Gegner verbinden"
     override val searchingOpponent = "Suche nach Gegner …"
     override val waitingForPlayer = "Warte auf einen anderen Spieler, der gerade sucht."
@@ -438,6 +447,10 @@ object EsTexts : Texts {
     override val findGameTitle = "Buscar partida"
     override val anyGame = "Partida cualquiera"
     override val orPickCount = "… o elige el número de rivales"
+    override val adFreeBtn = "Jugar sin anuncios"
+    override val adFreeActive = "✅ Sin anuncios"
+    override val watchAdUnlock = "Ver vídeo"
+    override val buyUnlock = "Comprar"
     override val onlineSubtitle = "Conéctate automáticamente con un rival"
     override val searchingOpponent = "Buscando rival …"
     override val waitingForPlayer = "Esperando a otro jugador que esté buscando."
@@ -608,6 +621,10 @@ object EnTexts : Texts {
     override val findGameTitle = "Find a game"
     override val anyGame = "Any game"
     override val orPickCount = "… or pick a number of opponents"
+    override val adFreeBtn = "Go ad-free"
+    override val adFreeActive = "✅ Ad-free"
+    override val watchAdUnlock = "Watch video"
+    override val buyUnlock = "Buy"
     override val onlineSubtitle = "Connect with an opponent automatically"
     override val searchingOpponent = "Looking for an opponent …"
     override val waitingForPlayer = "Waiting for another player who's searching."
@@ -778,6 +795,10 @@ object FrTexts : Texts {
     override val findGameTitle = "Trouver une partie"
     override val anyGame = "Partie quelconque"
     override val orPickCount = "… ou choisis le nombre d'adversaires"
+    override val adFreeBtn = "Jouer sans pub"
+    override val adFreeActive = "✅ Sans pub"
+    override val watchAdUnlock = "Regarder la vidéo"
+    override val buyUnlock = "Acheter"
     override val onlineSubtitle = "Se connecter automatiquement à un adversaire"
     override val searchingOpponent = "Recherche d'un adversaire …"
     override val waitingForPlayer = "En attente d'un autre joueur en recherche."
@@ -948,6 +969,10 @@ object ZhTexts : Texts {
     override val findGameTitle = "寻找对局"
     override val anyGame = "任意对局"
     override val orPickCount = "…或选择对手数量"
+    override val adFreeBtn = "无广告畅玩"
+    override val adFreeActive = "✅ 无广告"
+    override val watchAdUnlock = "观看视频"
+    override val buyUnlock = "购买"
     override val onlineSubtitle = "自动与对手连接"
     override val searchingOpponent = "正在寻找对手 …"
     override val waitingForPlayer = "正在等待另一位也在寻找的玩家。"
@@ -1117,6 +1142,10 @@ object TlTexts : Texts {
     override val findGameTitle = "Maghanap ng laro"
     override val anyGame = "Kahit anong laro"
     override val orPickCount = "… o pumili ng bilang ng kalaban"
+    override val adFreeBtn = "Maglaro nang walang ads"
+    override val adFreeActive = "✅ Walang ads"
+    override val watchAdUnlock = "Manood ng video"
+    override val buyUnlock = "Bumili"
     override val onlineSubtitle = "Awtomatikong kumonekta sa isang kalaban"
     override val searchingOpponent = "Naghahanap ng kalaban …"
     override val waitingForPlayer = "Naghihintay ng ibang manlalarong naghahanap din."
