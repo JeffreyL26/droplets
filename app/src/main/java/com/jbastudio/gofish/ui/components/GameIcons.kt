@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.rotate
 import com.jbastudio.gofish.ui.theme.*
 import kotlin.math.cos
 import kotlin.math.sin
@@ -26,7 +27,7 @@ import kotlin.math.sin
 enum class GameIconKind {
     GLOBE, HOME, ROD, WAVE, FISH, SATELLITE, HAND, SEARCH, PENCIL, CHECK, CLOSE,
     DECK, CARD, BOOKS, BOOKS_CLASSIC, SCROLL, ARROW_UP, ARROW_LEFT, HOURGLASS, TROPHY, HOOK, HANDSHAKE,
-    CLAPPER, FLAG_CHECKERED, SPEAKER, SPEAKER_MUTED
+    CLAPPER, FLAG_CHECKERED, SPEAKER, SPEAKER_MUTED, DICE
 }
 
 @Composable
@@ -70,6 +71,7 @@ private fun DrawScope.drawGameIcon(kind: GameIconKind, c: Color) {
         GameIconKind.FLAG_CHECKERED -> drawCheckeredFlag(c, colored)
         GameIconKind.SPEAKER        -> drawSpeaker(c, colored, muted = false)
         GameIconKind.SPEAKER_MUTED  -> drawSpeaker(c, colored, muted = true)
+        GameIconKind.DICE           -> drawDice(c, colored)
     }
 }
 
@@ -327,6 +329,27 @@ private fun DrawScope.drawCard(c: Color, colored: Boolean) {
         stroke = s)
     // kleiner Stern in der Mitte
     drawStar(Offset(w * 0.50f, h * 0.50f), size.minDimension * 0.13f, if (colored) SunDeep else c)
+}
+
+private fun DrawScope.drawDice(c: Color, colored: Boolean) {
+    val w = size.width; val h = size.height
+    val s = sw() * 0.85f
+    // Leicht gekippter Würfel — vermittelt „würfeln/Zufall" (Beliebiges-Spiel-Button).
+    rotate(degrees = -13f, pivot = Offset(w * 0.5f, h * 0.5f)) {
+        val side = size.minDimension * 0.62f
+        val left = w * 0.5f - side / 2f
+        val top  = h * 0.5f - side / 2f
+        val r    = side * 0.22f
+        // Würfelkörper: weiße Fläche (farbig) bzw. nur Umriss (getönt)
+        if (colored) drawRoundRectCompat(Foam, Offset(left, top), Size(side, side), r)
+        drawRoundRectCompat(c, Offset(left, top), Size(side, side), r, stroke = s)
+        // Fünf Augen (Quincunx)
+        val pr = size.minDimension * 0.056f
+        for (px in floatArrayOf(0.35f, 0.65f))
+            for (py in floatArrayOf(0.35f, 0.65f))
+                drawCircle(c, pr, Offset(w * px, h * py))
+        drawCircle(c, pr, Offset(w * 0.5f, h * 0.5f))
+    }
 }
 
 private fun DrawScope.drawBooks(c: Color, colored: Boolean) {
