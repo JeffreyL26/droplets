@@ -17,6 +17,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -79,12 +80,14 @@ class MainActivity : ComponentActivity() {
         val langPrefs   = LanguagePrefs(this)
         val soundPrefs  = SoundPrefs(this)
         val musicPrefs  = MusicPrefs(this)
+        val namePrefs   = NamePrefs(this)
         // Initialer Avatar aus Prefs in den Holder spielen
         GameHolder.myAvatar = avatarPrefs.load()
 
         setContent {
             GoFishTheme {
-                var name    by remember { mutableStateOf("") }
+                // Gespeicherter Name → beim nächsten Öffnen Begrüßung statt leerem Feld.
+                var name    by remember { mutableStateOf(namePrefs.load()) }
                 var hostIp  by remember { mutableStateOf("") }
                 var status  by remember { mutableStateOf("") }
                 var isError by remember { mutableStateOf(false) }
@@ -212,7 +215,7 @@ class MainActivity : ComponentActivity() {
 
                 if (showSettingsDlg) {
                     SettingsDialog(
-                        version = "Pre-Launch MP240626.1",
+                        version = "Pre-Launch MP240626.3",
                         soundVolume = soundVolume,
                         soundMuted  = soundMuted,
                         onSoundVolumeChange = { v ->
@@ -264,7 +267,7 @@ class MainActivity : ComponentActivity() {
                 when (screen) {
                   Screen.MENU -> MainMenuScreen(
                       name          = name,
-                      onNameChange  = { name = it },
+                      onNameChange  = { name = it; namePrefs.save(it) },
                       avatar        = avatarChoice,
                       onAvatarClick = { showAvatarDlg = true },
                       onFindGame    = { goTo(Screen.ONLINE) },
@@ -290,7 +293,7 @@ class MainActivity : ComponentActivity() {
 
                   Screen.LOCAL -> LobbyScreen(
                     name           = name,
-                    onNameChange   = { name = it },
+                    onNameChange   = { name = it; namePrefs.save(it) },
                     hostIp         = hostIp,
                     onHostIpChange = { hostIp = it },
                     myIp           = myIp,
@@ -1166,17 +1169,45 @@ private fun PlayerCard(
     enabled: Boolean
 ) {
     val t = LocalTexts.current
+    // Ist bereits ein Name gesetzt, zeigt die Karte „Hallo [Name]!"; Antippen (Bleistift)
+    // wechselt zurück ins Eingabefeld. Ohne Namen (frisch) startet sie direkt im Feld.
+    var editing by remember { mutableStateOf(name.isBlank()) }
     BubblePanel(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(18.dp)) {
-            SectionLabel(t.yourName)
-            Spacer(Modifier.height(6.dp))
-            PastelTextField(
-                value = name,
-                onChange = onNameChange,
-                placeholder = t.namePlaceholder,
-                capWords = true,
-                enabled = enabled
-            )
+            if (editing) {
+                SectionLabel(t.yourName)
+                Spacer(Modifier.height(6.dp))
+                PastelTextField(
+                    value = name,
+                    onChange = onNameChange,
+                    placeholder = t.namePlaceholder,
+                    capWords = true,
+                    enabled = enabled,
+                    // „Fertig" auf der Tastatur → zurück zur Begrüßung (sofern ein Name da ist)
+                    onImeDone = { if (name.isNotBlank()) editing = false }
+                )
+            } else {
+                // Begrüßung mit Bleistift-Icon — Antippen führt zurück ins Eingabefeld.
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(OceanTop.copy(alpha = 0.6f))
+                        .clickable(enabled = enabled) { GameSounds.playClick(); editing = true }
+                        .padding(horizontal = 14.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = t.hello(name.trim()),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = DeepSea,
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    GameIcon(GameIconKind.PENCIL, modifier = Modifier.size(20.dp), tint = DeepSea)
+                }
+            }
             Spacer(Modifier.height(14.dp))
             AvatarChooserRow(
                 avatar  = avatar,
@@ -1472,7 +1503,8 @@ private fun PastelTextField(
     onChange: (String) -> Unit,
     placeholder: String,
     capWords: Boolean = false,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    onImeDone: (() -> Unit)? = null
 ) {
     OutlinedTextField(
         value = value,
@@ -1486,6 +1518,9 @@ private fun PastelTextField(
             capitalization = if (capWords) KeyboardCapitalization.Words else KeyboardCapitalization.None,
             imeAction      = ImeAction.Done
         ),
+        // Nur überschreiben, wenn ein onImeDone gesetzt ist — sonst Default (schließt Tastatur).
+        keyboardActions = if (onImeDone != null) KeyboardActions(onDone = { onImeDone() })
+                          else KeyboardActions.Default,
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor   = SeafoamDeep,
             unfocusedBorderColor = OceanDeep,

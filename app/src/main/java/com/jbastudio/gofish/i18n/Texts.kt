@@ -38,6 +38,7 @@ interface Texts {
     // ── Spieler-Karte ──
     val yourName: String
     val namePlaceholder: String
+    fun hello(name: String): String      // Begrüßung im Hauptmenü, wenn ein Name gesetzt ist
     val yourAvatar: String
     fun avatarSummary(kind: String, color: String): String
 
@@ -213,6 +214,7 @@ object DeTexts : Texts {
 
     override val yourName = "Dein Name"
     override val namePlaceholder = "z. B. Käpt'n Nemo"
+    override fun hello(name: String) = "Hallo $name!"
     override val yourAvatar = "Dein Avatar"
     override fun avatarSummary(kind: String, color: String) = "$kind · $color"
 
@@ -382,6 +384,7 @@ object EsTexts : Texts {
 
     override val yourName = "Tu nombre"
     override val namePlaceholder = "p. ej. Capitán Nemo"
+    override fun hello(name: String) = "¡Hola, $name!"
     override val yourAvatar = "Tu avatar"
     override fun avatarSummary(kind: String, color: String) = "$kind · $color"
 
@@ -551,6 +554,7 @@ object EnTexts : Texts {
 
     override val yourName = "Your name"
     override val namePlaceholder = "e.g. Captain Nemo"
+    override fun hello(name: String) = "Hello, $name!"
     override val yourAvatar = "Your avatar"
     override fun avatarSummary(kind: String, color: String) = "$kind · $color"
 
@@ -720,6 +724,7 @@ object FrTexts : Texts {
 
     override val yourName = "Ton nom"
     override val namePlaceholder = "p. ex. Capitaine Nemo"
+    override fun hello(name: String) = "Salut $name !"
     override val yourAvatar = "Ton avatar"
     override fun avatarSummary(kind: String, color: String) = "$kind · $color"
 
@@ -889,6 +894,7 @@ object ZhTexts : Texts {
 
     override val yourName = "你的名字"
     override val namePlaceholder = "例如 尼莫船长"
+    override fun hello(name: String) = "你好，$name！"
     override val yourAvatar = "你的头像"
     override fun avatarSummary(kind: String, color: String) = "$kind · $color"
 
@@ -1057,6 +1063,7 @@ object TlTexts : Texts {
 
     override val yourName = "Pangalan mo"
     override val namePlaceholder = "hal. Kapitan Nemo"
+    override fun hello(name: String) = "Kumusta, $name!"
     override val yourAvatar = "Avatar mo"
     override fun avatarSummary(kind: String, color: String) = "$kind · $color"
 
