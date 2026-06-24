@@ -258,6 +258,12 @@ object DeTexts : Texts {
         AvatarKind.DOLPHIN -> "Delfin"
         AvatarKind.PUFFER -> "Kugelfisch"
         AvatarKind.STARFISH -> "Seestern"
+        AvatarKind.MOBY -> "Moby Dick"
+        AvatarKind.NESSIE -> "Nessie"
+        AvatarKind.BLOBFISH -> "Blobfisch"
+        AvatarKind.KOI -> "Koifisch"
+        AvatarKind.BACKFISCH -> "Backfisch"
+        AvatarKind.MEGALODON -> "Megalodon"
     }
     override fun colorName(color: AvatarColor) = when (color) {
         AvatarColor.SUN -> "Sonnengelb"
@@ -456,6 +462,12 @@ object EsTexts : Texts {
         AvatarKind.DOLPHIN -> "Delfín"
         AvatarKind.PUFFER -> "Pez globo"
         AvatarKind.STARFISH -> "Estrella"
+        AvatarKind.MOBY -> "Moby Dick"
+        AvatarKind.NESSIE -> "Nessie"
+        AvatarKind.BLOBFISH -> "Pez borrón"
+        AvatarKind.KOI -> "Carpa koi"
+        AvatarKind.BACKFISCH -> "Pescado frito"
+        AvatarKind.MEGALODON -> "Megalodón"
     }
     override fun colorName(color: AvatarColor) = when (color) {
         AvatarColor.SUN -> "Amarillo"
@@ -654,6 +666,12 @@ object EnTexts : Texts {
         AvatarKind.DOLPHIN -> "Dolphin"
         AvatarKind.PUFFER -> "Pufferfish"
         AvatarKind.STARFISH -> "Starfish"
+        AvatarKind.MOBY -> "Moby Dick"
+        AvatarKind.NESSIE -> "Nessie"
+        AvatarKind.BLOBFISH -> "Blobfish"
+        AvatarKind.KOI -> "Koi"
+        AvatarKind.BACKFISCH -> "Fried Fish"
+        AvatarKind.MEGALODON -> "Megalodon"
     }
     override fun colorName(color: AvatarColor) = when (color) {
         AvatarColor.SUN -> "Sunny"
@@ -852,6 +870,12 @@ object FrTexts : Texts {
         AvatarKind.DOLPHIN -> "Dauphin"
         AvatarKind.PUFFER -> "Poisson-globe"
         AvatarKind.STARFISH -> "Étoile de mer"
+        AvatarKind.MOBY -> "Moby Dick"
+        AvatarKind.NESSIE -> "Nessie"
+        AvatarKind.BLOBFISH -> "Blobfish"
+        AvatarKind.KOI -> "Carpe koï"
+        AvatarKind.BACKFISCH -> "Poisson frit"
+        AvatarKind.MEGALODON -> "Mégalodon"
     }
     override fun colorName(color: AvatarColor) = when (color) {
         AvatarColor.SUN -> "Jaune soleil"
@@ -1050,6 +1074,12 @@ object ZhTexts : Texts {
         AvatarKind.DOLPHIN -> "海豚"
         AvatarKind.PUFFER -> "河豚"
         AvatarKind.STARFISH -> "海星"
+        AvatarKind.MOBY -> "莫比·迪克"
+        AvatarKind.NESSIE -> "尼斯湖水怪"
+        AvatarKind.BLOBFISH -> "水滴鱼"
+        AvatarKind.KOI -> "锦鲤"
+        AvatarKind.BACKFISCH -> "炸鱼"
+        AvatarKind.MEGALODON -> "巨齿鲨"
     }
     override fun colorName(color: AvatarColor) = when (color) {
         AvatarColor.SUN -> "阳光黄"
@@ -1247,6 +1277,12 @@ object TlTexts : Texts {
         AvatarKind.DOLPHIN -> "Dolphin"
         AvatarKind.PUFFER -> "Butete"
         AvatarKind.STARFISH -> "Bituing-dagat"
+        AvatarKind.MOBY -> "Moby Dick"
+        AvatarKind.NESSIE -> "Nessie"
+        AvatarKind.BLOBFISH -> "Blobfish"
+        AvatarKind.KOI -> "Koi"
+        AvatarKind.BACKFISCH -> "Pritong isda"
+        AvatarKind.MEGALODON -> "Megalodon"
     }
     override fun colorName(color: AvatarColor) = when (color) {
         AvatarColor.SUN -> "Dilaw na araw"

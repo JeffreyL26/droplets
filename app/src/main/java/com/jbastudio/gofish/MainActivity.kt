@@ -248,7 +248,7 @@ class MainActivity : ComponentActivity() {
 
                 if (showSettingsDlg) {
                     SettingsDialog(
-                        version = "Pre-Launch MP240626.7",
+                        version = "Pre-Launch MP240626.8",
                         soundVolume = soundVolume,
                         soundMuted  = soundMuted,
                         onSoundVolumeChange = { v ->
@@ -1861,6 +1861,8 @@ private fun AvatarSelectionDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .heightIn(max = 560.dp)
+                    .verticalScroll(rememberScrollState())
                     .padding(horizontal = 20.dp, vertical = 22.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -1873,43 +1875,47 @@ private fun AvatarSelectionDialog(
                 )
                 Spacer(Modifier.height(16.dp))
 
-                // 2 x 3 Avatar-Grid
+                // Avatar-Grid (dynamisch: Reihen zu je 3 — wächst mit neuen Avataren)
                 val kinds = AvatarKind.values().toList()
-                for (rowIdx in 0..1) {
+                kinds.chunked(3).forEachIndexed { rowIdx, rowKinds ->
+                    if (rowIdx > 0) Spacer(Modifier.height(10.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        for (colIdx in 0..2) {
-                            val idx = rowIdx * 3 + colIdx
+                        rowKinds.forEach { k ->
                             AvatarTile(
-                                kind      = kinds[idx],
+                                kind      = k,
                                 color     = currentChoice.color,
-                                selected  = currentChoice.kind == kinds[idx],
-                                onSelect  = { onChoiceChange(currentChoice.copy(kind = kinds[idx])) },
-                                onWatchAd = { onWatchAd(kinds[idx]) },
-                                onBuy     = { onBuy(kinds[idx]) },
+                                selected  = currentChoice.kind == k,
+                                onSelect  = { onChoiceChange(currentChoice.copy(kind = k)) },
+                                onWatchAd = { onWatchAd(k) },
+                                onBuy     = { onBuy(k) },
                                 modifier  = Modifier.weight(1f)
                             )
                         }
+                        // unvollständige letzte Reihe auffüllen → Kacheln bleiben gleich breit
+                        repeat(3 - rowKinds.size) { Spacer(Modifier.weight(1f)) }
                     }
-                    if (rowIdx == 0) Spacer(Modifier.height(10.dp))
                 }
 
-                Spacer(Modifier.height(20.dp))
-                Text(t.colorLabel, style = MaterialTheme.typography.titleLarge, color = DeepSea)
-                Spacer(Modifier.height(10.dp))
+                // Farbauswahl nur für Avatare OHNE feste Farbe (Premium-Avatare haben eine feste).
+                if (!currentChoice.kind.fixedColor) {
+                    Spacer(Modifier.height(20.dp))
+                    Text(t.colorLabel, style = MaterialTheme.typography.titleLarge, color = DeepSea)
+                    Spacer(Modifier.height(10.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    AvatarColor.values().forEach { col ->
-                        ColorSwatch(
-                            color    = col,
-                            selected = currentChoice.color == col,
-                            onClick  = { onChoiceChange(currentChoice.copy(color = col)) }
-                        )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        AvatarColor.values().forEach { col ->
+                            ColorSwatch(
+                                color    = col,
+                                selected = currentChoice.color == col,
+                                onClick  = { onChoiceChange(currentChoice.copy(color = col)) }
+                            )
+                        }
                     }
                 }
 

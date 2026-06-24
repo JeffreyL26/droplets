@@ -18,6 +18,8 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.translate
 import com.jbastudio.gofish.store.AvatarSkinTier
 import com.jbastudio.gofish.ui.theme.*
 import kotlin.math.cos
@@ -31,14 +33,24 @@ import kotlin.math.sin
 enum class AvatarKind(
     val displayName: String,
     val emoji: String,
-    val defaultTier: AvatarSkinTier
+    val defaultTier: AvatarSkinTier,
+    /** Premium-Avatare haben eine FESTE Farbe — die Farbauswahl wird ausgeblendet. */
+    val fixedColor: Boolean = false
 ) {
     FISH    ("Fisch",        "🐟", AvatarSkinTier.FREE),
     SHARK   ("Hai",          "🦈", AvatarSkinTier.FREE),
     WHALE   ("Wal",          "🐳", AvatarSkinTier.LOCKED),
     DOLPHIN ("Delfin",       "🐬", AvatarSkinTier.LOCKED),
     PUFFER  ("Kugelfisch",   "🐡", AvatarSkinTier.LOCKED),
-    STARFISH("Seestern",     "⭐", AvatarSkinTier.LOCKED)
+    STARFISH("Seestern",     "⭐", AvatarSkinTier.LOCKED),
+
+    // ── Premium-Avatare: feste Farbe, hochdetailliert, hinter Pay-/Ad-Wall ──
+    MOBY      ("Moby Dick",  "🐋", AvatarSkinTier.LOCKED, fixedColor = true),
+    NESSIE    ("Nessie",     "🦕", AvatarSkinTier.LOCKED, fixedColor = true),
+    BLOBFISH  ("Blobfisch",  "🐠", AvatarSkinTier.LOCKED, fixedColor = true),
+    KOI       ("Koifisch",   "🎏", AvatarSkinTier.LOCKED, fixedColor = true),
+    BACKFISCH ("Backfisch",  "🍤", AvatarSkinTier.LOCKED, fixedColor = true),
+    MEGALODON ("Megalodon",  "🦈", AvatarSkinTier.LOCKED, fixedColor = true)
 }
 
 enum class AvatarColor(
@@ -125,11 +137,35 @@ private fun DrawScope.drawAvatar(
         AvatarKind.DOLPHIN  -> drawDolphinShape(body, bodyDeep, facingRight, anim)
         AvatarKind.PUFFER   -> drawPufferShape(body, bodyDeep, anim)
         AvatarKind.STARFISH -> drawStarfishShape(body, bodyDeep, anim)
+        // Premium-Avatare: feste Farbe (body/bodyDeep ignoriert), nach rechts gezeichnet.
+        AvatarKind.MOBY      -> drawPremium(facingRight, anim) { drawMobyShape() }
+        AvatarKind.NESSIE    -> drawPremium(facingRight, anim) { drawNessieShape() }
+        AvatarKind.BLOBFISH  -> drawPremium(facingRight, anim) { drawBlobfishShape() }
+        AvatarKind.KOI       -> drawPremium(facingRight, anim) { drawKoiShape() }
+        AvatarKind.BACKFISCH -> drawPremium(facingRight, anim) { drawBackfischShape() }
+        AvatarKind.MEGALODON -> drawPremium(facingRight, anim) { drawMegalodonShape() }
     }
 }
 
 private fun mirror(facingRight: Boolean, w: Float): (Float) -> Float =
     if (facingRight) { x -> x } else { x -> w - x }
+
+/**
+ * Rahmen für die Premium-Avatare: Sie werden in [PremiumAvatars.kt] immer mit Blick
+ * nach rechts gezeichnet. Hier kommt das gemeinsame Verhalten dazu — sanftes
+ * vertikales Bob (animiert) und die Links-Spiegelung, wenn [facingRight] false ist.
+ */
+private fun DrawScope.drawPremium(
+    facingRight: Boolean,
+    anim: AnimParams,
+    block: DrawScope.() -> Unit
+) {
+    val dy = anim.bob * size.height * 0.03f
+    translate(top = dy) {
+        if (facingRight) block()
+        else scale(scaleX = -1f, scaleY = 1f, pivot = Offset(size.width / 2f, size.height / 2f)) { block() }
+    }
+}
 
 // ═════════════════════════════════════════════════════════════════════════
 //  FISCH  (Default)

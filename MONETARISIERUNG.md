@@ -49,7 +49,10 @@ nach dem manuellen Play-Console-/AdMob-Setup (s. u.).
 - [ ] Ad-Unit-IDs in `ads/AdManager.kt` (INTERSTITIAL_ID, REWARDED_ID) ersetzen.
 - [ ] Play-Console-Produkte anlegen und auf **Aktiv** setzen:
       `gofish_ad_free`, `gofish_skin_whale`, `gofish_skin_dolphin`,
-      `gofish_skin_puffer`, `gofish_skin_starfish`.
+      `gofish_skin_puffer`, `gofish_skin_starfish`,
+      sowie die Premium-Avatare (feste Farbe): `gofish_skin_moby`,
+      `gofish_skin_nessie`, `gofish_skin_blobfish`, `gofish_skin_koi`,
+      `gofish_skin_backfisch`, `gofish_skin_megalodon`.
 - [ ] Kauf mit echtem Testgerät + Play-Test-Account verifizieren.
 - [ ] `isMinifyEnabled = true` für den Release-Build erwägen (ProGuard-Regeln für
       Billing + AdMob liegen bereits in `app/proguard-rules.pro`).
