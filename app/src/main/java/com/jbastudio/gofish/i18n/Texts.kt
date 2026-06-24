@@ -95,6 +95,7 @@ interface Texts {
     val adFreeActive: String     // Status, wenn Ad-Free gekauft
     val watchAdUnlock: String    // Rewarded-Video-Unlock eines Skins
     val buyUnlock: String        // IAP-Unlock eines Skins
+    val privacyOptionsBtn: String // UMP-Datenschutzoptionen (Einwilligung ändern/widerrufen)
     val onlineSubtitle: String
     val searchingOpponent: String
     val waitingForPlayer: String
@@ -206,6 +207,29 @@ interface Texts {
     val animGaveAway: String
     val animBook: String
     fun animBookComplete(rank: String): String
+
+    // ── Tutorial ──
+    val tutorialBtn: String
+    val welcomeTitle: String
+    val welcomeQuestion: String
+    val welcomeYes: String
+    val welcomePlay: String
+    val tutorialHintText: String
+    val tutorialHintOk: String
+    val tutorialNext: String
+    val tutorialLeave: String
+    val tutorialPickCard: String
+    val tutorialPressAsk: String
+    val tutorialIntro: String
+    val tutorialAskIntro: String
+    val tutorialGoFishIntro: String
+    val tutorialOppTurn: String
+    val tutorialFinish: String
+    fun tutorialStole1(rank: String): String
+    fun tutorialStole2(rank: String): String
+    fun tutorialStole3(rank: String): String
+    fun tutorialBook(rank: String): String
+    fun tutorialGoFish(rank: String): String
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -277,6 +301,7 @@ object DeTexts : Texts {
     override val adFreeActive = "✅ Werbefrei"
     override val watchAdUnlock = "Video ansehen"
     override val buyUnlock = "Kaufen"
+    override val privacyOptionsBtn = "Datenschutzoptionen"
     override val onlineSubtitle = "Automatisch mit einem Gegner verbinden"
     override val searchingOpponent = "Suche nach Gegner …"
     override val waitingForPlayer = "Warte auf einen anderen Spieler, der gerade sucht."
@@ -380,6 +405,29 @@ object DeTexts : Texts {
     override val animGaveAway = "abgegeben!"
     override val animBook = "📚  BUCH!"
     override fun animBookComplete(rank: String) = "${rank}er komplett"
+
+    // ── Tutorial ──
+    override val tutorialBtn = "Tutorial"
+    override val welcomeTitle = "Willkommen zu GoFish!"
+    override val welcomeQuestion = "Weißt du, wie man spielt?"
+    override val welcomeYes = "Ja – lass uns loslegen"
+    override val welcomePlay = "Tutorial spielen"
+    override val tutorialHintText = "Kein Problem! Du kannst das Tutorial jederzeit über die Einstellungen starten."
+    override val tutorialHintOk = "Alles klar"
+    override val tutorialNext = "Weiter"
+    override val tutorialLeave = "Verlassen"
+    override val tutorialPickCard = "Tippe die markierte Karte an."
+    override val tutorialPressAsk = "Tippe jetzt unten auf den Frage-Knopf."
+    override val tutorialIntro = "Hallo! Ich zeige dir, wie GoFish läuft. Ziel: Sammle Bücher – vier Karten mit demselben Wert. Wer am Ende die meisten Bücher hat, gewinnt."
+    override val tutorialAskIntro = "Du bist am Zug. Frage deinen Gegner nach einem Wert, den du selbst auf der Hand hast. Beginnen wir mit den 7ern."
+    override val tutorialGoFishIntro = "Frag jetzt nach einem Wert, den dein Gegner wahrscheinlich nicht hat – den Damen."
+    override val tutorialOppTurn = "Jetzt ist Fisherman am Zug. Er fragt dich nach Königen und nimmt sie dir ab. So spielt ihr abwechselnd."
+    override val tutorialFinish = "Du hast alles gelernt. Besiege deinen Gegner!"
+    override fun tutorialStole1(rank: String) = "Fisherman hatte eine ${rank} – du nimmst sie dir! Weil du eine Karte bekommen hast, bist du gleich nochmal dran."
+    override fun tutorialStole2(rank: String) = "Stark! Fisherman hatte zwei ${rank}. Beide wandern auf deine Hand – und du bleibst am Zug."
+    override fun tutorialStole3(rank: String) = "Wow, gleich drei ${rank}! Jetzt hast du vier davon …"
+    override fun tutorialBook(rank: String) = "… und vier gleiche Karten sind ein Buch! Dein ${rank}-Buch wird beiseitegelegt. Genau darum geht es."
+    override fun tutorialGoFish(rank: String) = "Go Fish! Fisherman hatte keine ${rank}, also angelst du eine Karte vom Stapel. Passt sie nicht, ist dein Zug vorbei."
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -451,6 +499,7 @@ object EsTexts : Texts {
     override val adFreeActive = "✅ Sin anuncios"
     override val watchAdUnlock = "Ver vídeo"
     override val buyUnlock = "Comprar"
+    override val privacyOptionsBtn = "Opciones de privacidad"
     override val onlineSubtitle = "Conéctate automáticamente con un rival"
     override val searchingOpponent = "Buscando rival …"
     override val waitingForPlayer = "Esperando a otro jugador que esté buscando."
@@ -554,6 +603,29 @@ object EsTexts : Texts {
     override val animGaveAway = "¡entregadas!"
     override val animBook = "📚  ¡CUARTETO!"
     override fun animBookComplete(rank: String) = "$rank completo"
+
+    // ── Tutorial ──
+    override val tutorialBtn = "Tutorial"
+    override val welcomeTitle = "¡Bienvenido a GoFish!"
+    override val welcomeQuestion = "¿Sabes cómo se juega?"
+    override val welcomeYes = "Sí, ¡vamos a empezar!"
+    override val welcomePlay = "Jugar tutorial"
+    override val tutorialHintText = "¡Sin problema! Puedes empezar el tutorial cuando quieras desde los ajustes."
+    override val tutorialHintOk = "Entendido"
+    override val tutorialNext = "Siguiente"
+    override val tutorialLeave = "Salir"
+    override val tutorialPickCard = "Toca la carta resaltada."
+    override val tutorialPressAsk = "Toca «Pedir» para preguntar."
+    override val tutorialIntro = "¡Hola! Te enseño cómo funciona GoFish. Objetivo: reúne cuartetos: cuatro cartas del mismo valor. Gana quien tenga más cuartetos al final."
+    override val tutorialAskIntro = "Es tu turno. Pide a tu rival un valor que tú también tengas. Empecemos con los 7."
+    override val tutorialGoFishIntro = "Ahora pide un valor que tu rival probablemente no tenga: las reinas (Q)."
+    override val tutorialOppTurn = "Ahora le toca a Fisherman. Te pide reyes (K) y te los quita. Así jugáis por turnos."
+    override val tutorialFinish = "Lo has aprendido todo. ¡Ahora vence a tu rival!"
+    override fun tutorialStole1(rank: String) = "Fisherman tenía un ${rank}, ¡te lo llevas! Como conseguiste una carta, juegas otra vez."
+    override fun tutorialStole2(rank: String) = "¡Bien! Fisherman tenía dos ${rank}. Las dos pasan a tu mano y sigues tu turno."
+    override fun tutorialStole3(rank: String) = "¡Vaya, tres ${rank} de golpe! Ahora tienes cuatro …"
+    override fun tutorialBook(rank: String) = "… ¡y cuatro cartas iguales forman un cuarteto! Tu cuarteto de ${rank} se aparta. De eso se trata."
+    override fun tutorialGoFish(rank: String) = "«¡Go Fish!» Fisherman no tenía ningún ${rank}, así que robas una carta del mazo. Si no coincide, tu turno termina."
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -625,6 +697,7 @@ object EnTexts : Texts {
     override val adFreeActive = "✅ Ad-free"
     override val watchAdUnlock = "Watch video"
     override val buyUnlock = "Buy"
+    override val privacyOptionsBtn = "Privacy options"
     override val onlineSubtitle = "Connect with an opponent automatically"
     override val searchingOpponent = "Looking for an opponent …"
     override val waitingForPlayer = "Waiting for another player who's searching."
@@ -728,6 +801,29 @@ object EnTexts : Texts {
     override val animGaveAway = "handed over!"
     override val animBook = "📚  BOOK!"
     override fun animBookComplete(rank: String) = "$rank complete"
+
+    // ── Tutorial ──
+    override val tutorialBtn = "Tutorial"
+    override val welcomeTitle = "Welcome to GoFish!"
+    override val welcomeQuestion = "Do you know how to play?"
+    override val welcomeYes = "Yes – let's get started"
+    override val welcomePlay = "Play tutorial"
+    override val tutorialHintText = "No problem! You can start the tutorial anytime from the settings menu."
+    override val tutorialHintOk = "Got it"
+    override val tutorialNext = "Next"
+    override val tutorialLeave = "Leave"
+    override val tutorialPickCard = "Tap the highlighted card."
+    override val tutorialPressAsk = "Tap “Ask” to ask."
+    override val tutorialIntro = "Hi! Let me show you how GoFish works. Goal: collect books – four cards of the same value. Whoever has the most books at the end wins."
+    override val tutorialAskIntro = "It's your turn. Ask your opponent for a value you hold yourself. Let's start with the 7s."
+    override val tutorialGoFishIntro = "Now ask for a value your opponent probably doesn't have – the Queens."
+    override val tutorialOppTurn = "Now it's Fisherman's turn. He asks you for Kings and takes them from you. That's how you take turns."
+    override val tutorialFinish = "You've learned everything. Now beat your opponent!"
+    override fun tutorialStole1(rank: String) = "Fisherman had one ${rank} – you take it! Because you got a card, you go again."
+    override fun tutorialStole2(rank: String) = "Nice! Fisherman had two ${rank}. Both come to your hand – and you stay on turn."
+    override fun tutorialStole3(rank: String) = "Wow, three ${rank} at once! Now you have four of them …"
+    override fun tutorialBook(rank: String) = "… and four matching cards make a book! Your book of ${rank}s is set aside. That's the whole point."
+    override fun tutorialGoFish(rank: String) = "“Go Fish!” Fisherman had no ${rank}, so you draw a card from the deck. If it doesn't match, your turn ends."
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -799,6 +895,7 @@ object FrTexts : Texts {
     override val adFreeActive = "✅ Sans pub"
     override val watchAdUnlock = "Regarder la vidéo"
     override val buyUnlock = "Acheter"
+    override val privacyOptionsBtn = "Options de confidentialité"
     override val onlineSubtitle = "Se connecter automatiquement à un adversaire"
     override val searchingOpponent = "Recherche d'un adversaire …"
     override val waitingForPlayer = "En attente d'un autre joueur en recherche."
@@ -902,6 +999,29 @@ object FrTexts : Texts {
     override val animGaveAway = "données !"
     override val animBook = "📚  CARRÉ !"
     override fun animBookComplete(rank: String) = "$rank complété"
+
+    // ── Tutorial ──
+    override val tutorialBtn = "Tutoriel"
+    override val welcomeTitle = "Bienvenue dans GoFish !"
+    override val welcomeQuestion = "Sais-tu comment jouer ?"
+    override val welcomeYes = "Oui – c'est parti"
+    override val welcomePlay = "Jouer le tutoriel"
+    override val tutorialHintText = "Pas de souci ! Tu peux lancer le tutoriel à tout moment depuis les réglages."
+    override val tutorialHintOk = "Compris"
+    override val tutorialNext = "Suivant"
+    override val tutorialLeave = "Quitter"
+    override val tutorialPickCard = "Touche la carte en surbrillance."
+    override val tutorialPressAsk = "Touche « Demander » pour demander."
+    override val tutorialIntro = "Salut ! Je te montre comment marche GoFish. But : réunir des carrés – quatre cartes de même valeur. Celui qui a le plus de carrés à la fin gagne."
+    override val tutorialAskIntro = "C'est ton tour. Demande à ton adversaire une valeur que tu as toi-même. Commençons par les 7."
+    override val tutorialGoFishIntro = "Demande maintenant une valeur que ton adversaire n'a sûrement pas – les dames (Q)."
+    override val tutorialOppTurn = "C'est au tour de Fisherman. Il te demande des rois (K) et te les prend. C'est ainsi qu'on joue chacun son tour."
+    override val tutorialFinish = "Tu as tout appris. À toi de battre ton adversaire !"
+    override fun tutorialStole1(rank: String) = "Fisherman avait un ${rank} – tu le prends ! Comme tu as reçu une carte, tu rejoues."
+    override fun tutorialStole2(rank: String) = "Bien joué ! Fisherman avait deux ${rank}. Les deux rejoignent ta main et tu gardes la main."
+    override fun tutorialStole3(rank: String) = "Waouh, trois ${rank} d'un coup ! Tu en as maintenant quatre …"
+    override fun tutorialBook(rank: String) = "… et quatre cartes identiques forment un carré ! Ton carré de ${rank} est mis de côté. C'est tout l'objectif."
+    override fun tutorialGoFish(rank: String) = "« Go Fish ! » Fisherman n'avait aucun ${rank}, tu pioches donc une carte. Si elle ne correspond pas, ton tour se termine."
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -973,6 +1093,7 @@ object ZhTexts : Texts {
     override val adFreeActive = "✅ 无广告"
     override val watchAdUnlock = "观看视频"
     override val buyUnlock = "购买"
+    override val privacyOptionsBtn = "隐私选项"
     override val onlineSubtitle = "自动与对手连接"
     override val searchingOpponent = "正在寻找对手 …"
     override val waitingForPlayer = "正在等待另一位也在寻找的玩家。"
@@ -1075,6 +1196,29 @@ object ZhTexts : Texts {
     override val animGaveAway = "被拿走！"
     override val animBook = "📚  成组！"
     override fun animBookComplete(rank: String) = "$rank 凑齐"
+
+    // ── Tutorial ──
+    override val tutorialBtn = "教程"
+    override val welcomeTitle = "欢迎来到 GoFish！"
+    override val welcomeQuestion = "你知道怎么玩吗？"
+    override val welcomeYes = "知道 – 开始吧"
+    override val welcomePlay = "玩教程"
+    override val tutorialHintText = "没问题！你随时可以在设置里启动教程。"
+    override val tutorialHintOk = "知道了"
+    override val tutorialNext = "下一步"
+    override val tutorialLeave = "退出"
+    override val tutorialPickCard = "点击高亮的牌。"
+    override val tutorialPressAsk = "点击“询问”来要牌。"
+    override val tutorialIntro = "你好！我来教你玩 GoFish。目标：收集“组”——四张相同点数的牌。最后拥有最多组的人获胜。"
+    override val tutorialAskIntro = "轮到你了。向对手要一个你自己手上也有的点数。先从 7 开始。"
+    override val tutorialGoFishIntro = "现在要一个对手很可能没有的点数——Q。"
+    override val tutorialOppTurn = "现在轮到 Fisherman。他向你要 K，并把它们拿走。你们就这样轮流出牌。"
+    override val tutorialFinish = "你已经全部学会了。去打败你的对手吧！"
+    override fun tutorialStole1(rank: String) = "Fisherman 有一张 ${rank}——归你了！因为你拿到了牌，可以再来一次。"
+    override fun tutorialStole2(rank: String) = "漂亮！Fisherman 有两张 ${rank}，都到你手上了，你继续出牌。"
+    override fun tutorialStole3(rank: String) = "哇，一次三张 ${rank}！你现在有四张了……"
+    override fun tutorialBook(rank: String) = "……四张相同的牌就组成一组！你的 ${rank} 组被放到一边。这正是目标。"
+    override fun tutorialGoFish(rank: String) = "“Go Fish！”Fisherman 没有 ${rank}，于是你从牌堆摸一张。如果不匹配，你的回合就结束。"
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -1146,6 +1290,7 @@ object TlTexts : Texts {
     override val adFreeActive = "✅ Walang ads"
     override val watchAdUnlock = "Manood ng video"
     override val buyUnlock = "Bumili"
+    override val privacyOptionsBtn = "Mga opsyon sa privacy"
     override val onlineSubtitle = "Awtomatikong kumonekta sa isang kalaban"
     override val searchingOpponent = "Naghahanap ng kalaban …"
     override val waitingForPlayer = "Naghihintay ng ibang manlalarong naghahanap din."
@@ -1249,4 +1394,27 @@ object TlTexts : Texts {
     override val animGaveAway = "naibigay!"
     override val animBook = "📚  SET!"
     override fun animBookComplete(rank: String) = "Kumpleto ang $rank"
+
+    // ── Tutorial ──
+    override val tutorialBtn = "Tutorial"
+    override val welcomeTitle = "Maligayang pagdating sa GoFish!"
+    override val welcomeQuestion = "Alam mo ba kung paano maglaro?"
+    override val welcomeYes = "Oo – tara na"
+    override val welcomePlay = "Laruin ang tutorial"
+    override val tutorialHintText = "Walang problema! Puwede mong simulan ang tutorial anumang oras mula sa mga setting."
+    override val tutorialHintOk = "Sige"
+    override val tutorialNext = "Susunod"
+    override val tutorialLeave = "Umalis"
+    override val tutorialPickCard = "I-tap ang naka-highlight na baraha."
+    override val tutorialPressAsk = "I-tap ang “Magtanong” para magtanong."
+    override val tutorialIntro = "Kumusta! Ituturo ko kung paano laruin ang GoFish. Layunin: mangolekta ng mga set – apat na barahang magkapareho ng halaga. Mananalo ang may pinakamaraming set sa dulo."
+    override val tutorialAskIntro = "Ikaw na. Hingin sa kalaban ang halaga na hawak mo rin. Magsimula tayo sa mga 7."
+    override val tutorialGoFishIntro = "Ngayon, humingi ng halagang malamang na wala sa kalaban – ang mga reyna (Q)."
+    override val tutorialOppTurn = "Turn na ni Fisherman. Hihingin niya sa iyo ang mga hari (K) at kukunin ang mga ito. Ganito kayo naghahalinhinan."
+    override val tutorialFinish = "Natutunan mo na ang lahat. Talunin mo na ang kalaban mo!"
+    override fun tutorialStole1(rank: String) = "May isang ${rank} si Fisherman – sa iyo na! Dahil nakakuha ka ng baraha, ikaw ulit."
+    override fun tutorialStole2(rank: String) = "Galing! May dalawang ${rank} si Fisherman. Pareho silang mapupunta sa iyo at tuloy ang turn mo."
+    override fun tutorialStole3(rank: String) = "Wow, tatlong ${rank} agad! Mayroon ka nang apat …"
+    override fun tutorialBook(rank: String) = "… at ang apat na magkaparehong baraha ay isang set! Ang set mo ng ${rank} ay isinasantabi. Iyan ang layunin."
+    override fun tutorialGoFish(rank: String) = "“Go Fish!” Walang ${rank} si Fisherman, kaya kumuha ka ng baraha sa deck. Kung hindi tugma, tapos na ang turn mo."
 }

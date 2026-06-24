@@ -28,10 +28,23 @@ nach dem manuellen Play-Console-/AdMob-Setup (s. u.).
 6. Dev-Options-Texte bewusst **nicht lokalisiert** (nur Debug-Build).
 
 ## Vor dem ersten echten Release (Checkliste)
-- [ ] **DSGVO/Consent (UMP):** Für EU/DE ein Consent-Formular über die Google
-      *User Messaging Platform* (`com.google.android.ump:user-messaging-platform`)
-      einbinden und VOR dem Laden echter Ads anzeigen. **Fehlt aktuell bewusst**
-      (Test-Ads brauchen keinen Consent).
+- [x] **DSGVO/Consent (UMP):** Consent-Flow über die Google *User Messaging
+      Platform* (`com.google.android.ump:user-messaging-platform` 4.0.0, Catalog-
+      Eintrag `user-messaging-platform`) ist eingebunden.
+      `AdManager.initWithConsent(activity)` (Aufruf aus `MainActivity.onCreate`)
+      führt `requestConsentInfoUpdate` + `loadAndShowConsentFormIfRequired` aus und
+      initialisiert das Mobile Ads SDK ERST nach erteiltem/nicht erforderlichem
+      Consent. Noch manuell/offen:
+    - [ ] AdMob-Konsole → *Datenschutz & Mitteilungen* → GDPR-Mitteilung (Consent-
+          Formular) anlegen **und veröffentlichen** (sonst erscheint kein Formular).
+    - [ ] Test: Test-Geräte-Hash aus Logcat in `AdManager.debugConsentSettings()`
+          eintragen. Im Debug-Build wird die EWR-Region erzwungen
+          (`DEBUG_GEOGRAPHY_EEA`), sodass das Formular auch außerhalb der EU erscheint.
+    - [x] Datenschutzoptionen-Einstieg ist verdrahtet: Der Einstellungen-Dialog zeigt
+          einen lokalisierten „Datenschutzoptionen"-Button (`privacyOptionsBtn`,
+          alle 6 Sprachen), sobald `AdManager.isPrivacyOptionsRequired()` true ist;
+          er ruft `AdManager.showPrivacyOptionsForm(activity)` auf (Einwilligung
+          ändern/widerrufen).
 - [ ] AdMob-App-ID in `AndroidManifest.xml` durch die echte ID ersetzen.
 - [ ] Ad-Unit-IDs in `ads/AdManager.kt` (INTERSTITIAL_ID, REWARDED_ID) ersetzen.
 - [ ] Play-Console-Produkte anlegen und auf **Aktiv** setzen:

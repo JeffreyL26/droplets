@@ -53,6 +53,7 @@ dependencies {
     // Monetarisierung
     implementation(libs.billing.ktx)          // Google Play Billing (IAP)
     implementation(libs.play.services.ads)    // AdMob (Google Mobile Ads SDK)
+    implementation(libs.user.messaging.platform) // UMP — DSGVO/Consent (vor Ads)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

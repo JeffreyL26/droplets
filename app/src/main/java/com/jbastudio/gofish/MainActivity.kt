@@ -86,7 +86,8 @@ class MainActivity : ComponentActivity() {
         GameSounds.init(this)
         GameMusic.init(this)
         StoreManager.init(this)
-        AdManager.init(this)
+        // DSGVO/EU: zuerst UMP-Consent einholen, Ads werden erst danach geladen.
+        AdManager.initWithConsent(this)
         billingManager = BillingManager(this)
         val myIp = localIpAddress()
         val avatarPrefs = AvatarPrefs(this)
@@ -95,6 +96,7 @@ class MainActivity : ComponentActivity() {
         val soundPrefs  = SoundPrefs(this)
         val musicPrefs  = MusicPrefs(this)
         val namePrefs   = NamePrefs(this)
+        val welcomePrefs = WelcomePrefs(this)
         // Initialer Avatar aus Prefs in den Holder spielen
         GameHolder.myAvatar = avatarPrefs.load()
 
@@ -115,6 +117,9 @@ class MainActivity : ComponentActivity() {
                 var showServerDlg  by remember { mutableStateOf(false) }
                 var showSettingsDlg by remember { mutableStateOf(false) }
                 var showDevDlg      by remember { mutableStateOf(false) }
+                // Erstlauf-Begrüßung beim allerersten App-Start.
+                var showWelcomeDlg      by remember { mutableStateOf(!welcomePrefs.seen()) }
+                var showTutorialHintDlg by remember { mutableStateOf(false) }
                 // Sound-Einstellungen (Quelle der Wahrheit ist GameSounds; hier nur gespiegelt)
                 var soundVolume by remember { mutableStateOf(GameSounds.volume) }
                 var soundMuted  by remember { mutableStateOf(GameSounds.muted) }
@@ -243,7 +248,7 @@ class MainActivity : ComponentActivity() {
 
                 if (showSettingsDlg) {
                     SettingsDialog(
-                        version = "Pre-Launch MP240626.3",
+                        version = "Pre-Launch MP240626.6",
                         soundVolume = soundVolume,
                         soundMuted  = soundMuted,
                         onSoundVolumeChange = { v ->
@@ -276,6 +281,11 @@ class MainActivity : ComponentActivity() {
                                 BillingManager.AD_FREE_SKU
                             ) { _, _ -> /* Erfolg → StoreManager.setAdFree in BillingManager */ }
                         },
+                        onPrivacyOptions = { AdManager.showPrivacyOptionsForm(this@MainActivity) },
+                        onShowTutorial = {
+                            showSettingsDlg = false
+                            startActivity(Intent(this@MainActivity, TutorialActivity::class.java))
+                        },
                         onShowDevOptions = { showDevDlg = true },
                         onClose = { showSettingsDlg = false }
                     )
@@ -283,6 +293,25 @@ class MainActivity : ComponentActivity() {
 
                 if (showDevDlg) {
                     DevOptionsDialog(onClose = { showDevDlg = false })
+                }
+
+                if (showWelcomeDlg) {
+                    WelcomeDialog(
+                        onPlayTutorial = {
+                            welcomePrefs.setSeen(true)
+                            showWelcomeDlg = false
+                            startActivity(Intent(this@MainActivity, TutorialActivity::class.java))
+                        },
+                        onSkip = {
+                            welcomePrefs.setSeen(true)
+                            showWelcomeDlg = false
+                            showTutorialHintDlg = true
+                        }
+                    )
+                }
+
+                if (showTutorialHintDlg) {
+                    TutorialHintDialog(onClose = { showTutorialHintDlg = false })
                 }
 
                 if (showServerDlg) {
@@ -1051,7 +1080,9 @@ private fun SettingsDialog(
     musicMuted: Boolean,
     onMusicVolumeChange: (Float) -> Unit,
     onToggleMusicMute: () -> Unit,
+    onShowTutorial: () -> Unit,
     onBuyAdFree: () -> Unit,
+    onPrivacyOptions: () -> Unit,
     onShowDevOptions: () -> Unit,
     onClose: () -> Unit
 ) {
@@ -1121,6 +1152,16 @@ private fun SettingsDialog(
                     color = CoralDeep
                 )
 
+                // ── Tutorial ──
+                Spacer(Modifier.height(18.dp))
+                PastelButton(
+                    text = t.tutorialBtn,
+                    emoji = "🎓",
+                    enabled = true,
+                    container = Lavender,
+                    onClick = onShowTutorial
+                )
+
                 // ── Werbefrei (IAP) ──
                 Spacer(Modifier.height(18.dp))
                 if (StoreManager.isAdFree) {
@@ -1137,6 +1178,19 @@ private fun SettingsDialog(
                         container = SunYellow,
                         onClick = onBuyAdFree
                     )
+                }
+
+                // Datenschutzoptionen (UMP/DSGVO) — nur zeigen, wenn Google sie für
+                // diesen Nutzer verlangt (EU/EWR). Einwilligung ändern/widerrufen.
+                if (AdManager.isPrivacyOptionsRequired()) {
+                    Spacer(Modifier.height(12.dp))
+                    TextButton(onClick = { GameSounds.playClick(); onPrivacyOptions() }) {
+                        Text(
+                            t.privacyOptionsBtn,
+                            color = SoftSeaText,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
                 }
 
                 // Dev-Options — nur im Debug-Build sichtbar
@@ -1954,6 +2008,91 @@ private fun SmallUnlockButton(label: String, onClick: () -> Unit) {
         contentAlignment = Alignment.Center
     ) {
         Text(label, style = MaterialTheme.typography.labelSmall, color = Foam)
+    }
+}
+
+/** Erstlauf-Begrüßung: bietet direkt das Tutorial an oder steigt ins Spiel ein. */
+@Composable
+private fun WelcomeDialog(onPlayTutorial: () -> Unit, onSkip: () -> Unit) {
+    val t = LocalTexts.current
+    Dialog(
+        onDismissRequest = onSkip,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        BubblePanel(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+            background = Foam,
+            cornerRadius = 28.dp
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                FishMascot(
+                    modifier = Modifier.size(width = 120.dp, height = 88.dp),
+                    body = SeafoamGreen, bodyDeep = SeafoamDeep, facingRight = true
+                )
+                Text(
+                    t.welcomeTitle,
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = DeepSea,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    t.welcomeQuestion,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = SoftSeaText,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.height(4.dp))
+                PastelButton(
+                    text = t.welcomeYes, emoji = "🌊", enabled = true,
+                    container = SeafoamGreen, onClick = onSkip
+                )
+                PastelButton(
+                    text = t.welcomePlay, emoji = "🎓", enabled = true,
+                    container = SunYellow, onClick = onPlayTutorial
+                )
+            }
+        }
+    }
+}
+
+/** Hinweis nach „Ja – lass uns loslegen": Tutorial ist jederzeit über Einstellungen erreichbar. */
+@Composable
+private fun TutorialHintDialog(onClose: () -> Unit) {
+    val t = LocalTexts.current
+    Dialog(
+        onDismissRequest = onClose,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        BubblePanel(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+            background = Foam,
+            cornerRadius = 28.dp
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                FishMascot(
+                    modifier = Modifier.size(width = 96.dp, height = 70.dp),
+                    body = SunYellow, bodyDeep = SunDeep, facingRight = true
+                )
+                Text(
+                    t.tutorialHintText,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = DeepSea,
+                    textAlign = TextAlign.Center
+                )
+                PastelButton(
+                    text = t.tutorialHintOk, emoji = "✓", enabled = true,
+                    container = SeafoamGreen, onClick = onClose
+                )
+            }
+        }
     }
 }
 
