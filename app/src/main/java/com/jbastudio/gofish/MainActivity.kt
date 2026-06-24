@@ -248,7 +248,7 @@ class MainActivity : ComponentActivity() {
 
                 if (showSettingsDlg) {
                     SettingsDialog(
-                        version = "Pre-Launch MP240626.8",
+                        version = "Pre-Launch MP240626.10",
                         soundVolume = soundVolume,
                         soundMuted  = soundMuted,
                         onSoundVolumeChange = { v ->

@@ -218,6 +218,7 @@ interface Texts {
     val tutorialHintOk: String
     val tutorialNext: String
     val tutorialLeave: String
+    val tutorialPlayFree: String
     val tutorialPickCard: String
     val tutorialPressAsk: String
     val tutorialIntro: String
@@ -422,6 +423,7 @@ object DeTexts : Texts {
     override val tutorialHintOk = "Alles klar"
     override val tutorialNext = "Weiter"
     override val tutorialLeave = "Verlassen"
+    override val tutorialPlayFree = "Jetzt spielen"
     override val tutorialPickCard = "Tippe die markierte Karte an."
     override val tutorialPressAsk = "Tippe jetzt unten auf den Frage-Knopf."
     override val tutorialIntro = "Hallo! Ich zeige dir, wie GoFish läuft. Ziel: Sammle Bücher – vier Karten mit demselben Wert. Wer am Ende die meisten Bücher hat, gewinnt."
@@ -626,6 +628,7 @@ object EsTexts : Texts {
     override val tutorialHintOk = "Entendido"
     override val tutorialNext = "Siguiente"
     override val tutorialLeave = "Salir"
+    override val tutorialPlayFree = "Jugar ahora"
     override val tutorialPickCard = "Toca la carta resaltada."
     override val tutorialPressAsk = "Toca «Pedir» para preguntar."
     override val tutorialIntro = "¡Hola! Te enseño cómo funciona GoFish. Objetivo: reúne cuartetos: cuatro cartas del mismo valor. Gana quien tenga más cuartetos al final."
@@ -830,6 +833,7 @@ object EnTexts : Texts {
     override val tutorialHintOk = "Got it"
     override val tutorialNext = "Next"
     override val tutorialLeave = "Leave"
+    override val tutorialPlayFree = "Play now"
     override val tutorialPickCard = "Tap the highlighted card."
     override val tutorialPressAsk = "Tap “Ask” to ask."
     override val tutorialIntro = "Hi! Let me show you how GoFish works. Goal: collect books – four cards of the same value. Whoever has the most books at the end wins."
@@ -1034,6 +1038,7 @@ object FrTexts : Texts {
     override val tutorialHintOk = "Compris"
     override val tutorialNext = "Suivant"
     override val tutorialLeave = "Quitter"
+    override val tutorialPlayFree = "Jouer"
     override val tutorialPickCard = "Touche la carte en surbrillance."
     override val tutorialPressAsk = "Touche « Demander » pour demander."
     override val tutorialIntro = "Salut ! Je te montre comment marche GoFish. But : réunir des carrés – quatre cartes de même valeur. Celui qui a le plus de carrés à la fin gagne."
@@ -1237,6 +1242,7 @@ object ZhTexts : Texts {
     override val tutorialHintOk = "知道了"
     override val tutorialNext = "下一步"
     override val tutorialLeave = "退出"
+    override val tutorialPlayFree = "开始游戏"
     override val tutorialPickCard = "点击高亮的牌。"
     override val tutorialPressAsk = "点击“询问”来要牌。"
     override val tutorialIntro = "你好！我来教你玩 GoFish。目标：收集“组”——四张相同点数的牌。最后拥有最多组的人获胜。"
@@ -1441,6 +1447,7 @@ object TlTexts : Texts {
     override val tutorialHintOk = "Sige"
     override val tutorialNext = "Susunod"
     override val tutorialLeave = "Umalis"
+    override val tutorialPlayFree = "Maglaro na"
     override val tutorialPickCard = "I-tap ang naka-highlight na baraha."
     override val tutorialPressAsk = "I-tap ang “Magtanong” para magtanong."
     override val tutorialIntro = "Kumusta! Ituturo ko kung paano laruin ang GoFish. Layunin: mangolekta ng mga set – apat na barahang magkapareho ng halaga. Mananalo ang may pinakamaraming set sa dulo."

@@ -39,10 +39,10 @@ enum class AvatarKind(
 ) {
     FISH    ("Fisch",        "🐟", AvatarSkinTier.FREE),
     SHARK   ("Hai",          "🦈", AvatarSkinTier.FREE),
-    WHALE   ("Wal",          "🐳", AvatarSkinTier.LOCKED),
-    DOLPHIN ("Delfin",       "🐬", AvatarSkinTier.LOCKED),
-    PUFFER  ("Kugelfisch",   "🐡", AvatarSkinTier.LOCKED),
-    STARFISH("Seestern",     "⭐", AvatarSkinTier.LOCKED),
+    WHALE   ("Wal",          "🐳", AvatarSkinTier.FREE),
+    DOLPHIN ("Delfin",       "🐬", AvatarSkinTier.FREE),
+    PUFFER  ("Kugelfisch",   "🐡", AvatarSkinTier.FREE),
+    STARFISH("Seestern",     "⭐", AvatarSkinTier.FREE),
 
     // ── Premium-Avatare: feste Farbe, hochdetailliert, hinter Pay-/Ad-Wall ──
     MOBY      ("Moby Dick",  "🐋", AvatarSkinTier.LOCKED, fixedColor = true),
