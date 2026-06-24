@@ -47,7 +47,8 @@ private val EMOJI_ICONS: List<Pair<String, GameIconKind>> = listOf(
     "🤝" to GameIconKind.HANDSHAKE,
     "🎬" to GameIconKind.CLAPPER,
     "🏁" to GameIconKind.FLAG_CHECKERED,
-    "🎲" to GameIconKind.DICE
+    "🎲" to GameIconKind.DICE,
+    "🎓" to GameIconKind.GRAD_CAP
 )
 
 /** Liefert das passende [GameIconKind] zu einem (einzelnen) Emoji, oder null. */

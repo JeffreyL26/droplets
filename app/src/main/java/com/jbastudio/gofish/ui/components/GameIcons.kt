@@ -27,7 +27,7 @@ import kotlin.math.sin
 enum class GameIconKind {
     GLOBE, HOME, ROD, WAVE, FISH, SATELLITE, HAND, SEARCH, PENCIL, CHECK, CLOSE,
     DECK, CARD, BOOKS, BOOKS_CLASSIC, SCROLL, ARROW_UP, ARROW_LEFT, HOURGLASS, TROPHY, HOOK, HANDSHAKE,
-    CLAPPER, FLAG_CHECKERED, SPEAKER, SPEAKER_MUTED, DICE
+    CLAPPER, FLAG_CHECKERED, SPEAKER, SPEAKER_MUTED, DICE, GRAD_CAP
 }
 
 @Composable
@@ -72,6 +72,7 @@ private fun DrawScope.drawGameIcon(kind: GameIconKind, c: Color) {
         GameIconKind.SPEAKER        -> drawSpeaker(c, colored, muted = false)
         GameIconKind.SPEAKER_MUTED  -> drawSpeaker(c, colored, muted = true)
         GameIconKind.DICE           -> drawDice(c, colored)
+        GameIconKind.GRAD_CAP       -> drawGradCap(c, colored)
     }
 }
 
@@ -350,6 +351,46 @@ private fun DrawScope.drawDice(c: Color, colored: Boolean) {
                 drawCircle(c, pr, Offset(w * px, h * py))
         drawCircle(c, pr, Offset(w * 0.5f, h * 0.5f))
     }
+}
+
+/** Doktorhut (Mortarboard) + Quaste — Tutorial/Lern-Symbol. */
+private fun DrawScope.drawGradCap(c: Color, colored: Boolean) {
+    val w = size.width; val h = size.height; val s = sw()
+    val cx = w * 0.5f
+    val boardCol = if (colored) OceanDeep else c
+    val capCol   = if (colored) OceanMid else c
+    val tassel   = if (colored) SunDeep else c
+
+    // Mortarboard — flache, schräg gesehene Raute (Rhombus) oben.
+    val boardY = h * 0.40f
+    val board = Path().apply {
+        moveTo(cx, h * 0.22f)            // Spitze oben
+        lineTo(w * 0.90f, boardY)        // rechts
+        lineTo(cx, h * 0.58f)            // Spitze unten
+        lineTo(w * 0.10f, boardY)        // links
+        close()
+    }
+    drawPath(board, boardCol)
+    if (colored) strokePath(board, c, s * 0.6f)
+
+    // Kopfteil (Kappe) unter dem Brett.
+    val cap = Path().apply {
+        moveTo(w * 0.26f, h * 0.50f)
+        lineTo(w * 0.74f, h * 0.50f)
+        cubicTo(w * 0.74f, h * 0.74f, w * 0.26f, h * 0.74f, w * 0.26f, h * 0.50f)
+        close()
+    }
+    drawPath(cap, capCol)
+    strokePath(cap, c, s * 0.6f)
+
+    // Knopf in der Mitte des Bretts.
+    drawCircle(tassel, radius = size.minDimension * 0.045f, center = Offset(cx, boardY))
+
+    // Quaste: Schnur vom Knopf zur rechten Brettecke, dann herabhängend.
+    line(Offset(cx, boardY), Offset(w * 0.78f, h * 0.43f), tassel, s * 0.5f)
+    line(Offset(w * 0.78f, h * 0.43f), Offset(w * 0.78f, h * 0.66f), tassel, s * 0.5f)
+    // Quasten-Bommel
+    drawCircle(tassel, radius = size.minDimension * 0.05f, center = Offset(w * 0.78f, h * 0.70f))
 }
 
 private fun DrawScope.drawBooks(c: Color, colored: Boolean) {
