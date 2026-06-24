@@ -32,8 +32,9 @@ class GameServer {
         authority.send  = { pid, msg -> writers[pid]?.println(msg.toString()) }
     }
 
-    fun start(expectedPlayers: Int = 2) {
+    fun start(expectedPlayers: Int = 2, nameFallbackPrefix: String = "Player") {
         authority.expectedPlayers = expectedPlayers
+        authority.nameFallbackPrefix = nameFallbackPrefix
         Thread {
             try {
                 serverSocket = ServerSocket(Protocol.PORT)

@@ -451,18 +451,23 @@ fun BubblePanel(
     modifier: Modifier = Modifier,
     background: Color = Foam,
     cornerRadius: Dp = 22.dp,
+    onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
+    val shape = RoundedCornerShape(cornerRadius)
     Box(
         modifier = modifier
             .shadow(
                 elevation = 8.dp,
-                shape = RoundedCornerShape(cornerRadius),
+                shape = shape,
                 ambientColor = DeepSea.copy(alpha = 0.25f),
                 spotColor = DeepSea.copy(alpha = 0.25f)
             )
-            .clip(RoundedCornerShape(cornerRadius))
+            .clip(shape)
             .background(background)
+            // Klick NACH dem clip → das Aufleuchten (Ripple) folgt der abgerundeten
+            // Panel-Form statt der rechteckigen Hitbox.
+            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
     ) {
         content()
     }

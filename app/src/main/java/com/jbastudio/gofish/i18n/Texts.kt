@@ -87,6 +87,8 @@ interface Texts {
 
     // ── Online-Bildschirm ──
     val findGameTitle: String
+    val anyGame: String          // „Beliebiges Spiel" — Standard-Button (any-Match)
+    val orPickCount: String      // Hinweis über der festen Gegnerzahl-Auswahl
     val onlineSubtitle: String
     val searchingOpponent: String
     val waitingForPlayer: String
@@ -262,6 +264,8 @@ object DeTexts : Texts {
     override val cancelConnection = "Verbindung abbrechen"
 
     override val findGameTitle = "Spiel finden"
+    override val anyGame = "Beliebiges Spiel"
+    override val orPickCount = "… oder feste Gegnerzahl wählen"
     override val onlineSubtitle = "Automatisch mit einem Gegner verbinden"
     override val searchingOpponent = "Suche nach Gegner …"
     override val waitingForPlayer = "Warte auf einen anderen Spieler, der gerade sucht."
@@ -429,6 +433,8 @@ object EsTexts : Texts {
     override val cancelConnection = "Cancelar conexión"
 
     override val findGameTitle = "Buscar partida"
+    override val anyGame = "Partida cualquiera"
+    override val orPickCount = "… o elige el número de rivales"
     override val onlineSubtitle = "Conéctate automáticamente con un rival"
     override val searchingOpponent = "Buscando rival …"
     override val waitingForPlayer = "Esperando a otro jugador que esté buscando."
@@ -596,6 +602,8 @@ object EnTexts : Texts {
     override val cancelConnection = "Cancel connection"
 
     override val findGameTitle = "Find a game"
+    override val anyGame = "Any game"
+    override val orPickCount = "… or pick a number of opponents"
     override val onlineSubtitle = "Connect with an opponent automatically"
     override val searchingOpponent = "Looking for an opponent …"
     override val waitingForPlayer = "Waiting for another player who's searching."
@@ -763,6 +771,8 @@ object FrTexts : Texts {
     override val cancelConnection = "Annuler la connexion"
 
     override val findGameTitle = "Trouver une partie"
+    override val anyGame = "Partie quelconque"
+    override val orPickCount = "… ou choisis le nombre d'adversaires"
     override val onlineSubtitle = "Se connecter automatiquement à un adversaire"
     override val searchingOpponent = "Recherche d'un adversaire …"
     override val waitingForPlayer = "En attente d'un autre joueur en recherche."
@@ -930,6 +940,8 @@ object ZhTexts : Texts {
     override val cancelConnection = "取消连接"
 
     override val findGameTitle = "寻找对局"
+    override val anyGame = "任意对局"
+    override val orPickCount = "…或选择对手数量"
     override val onlineSubtitle = "自动与对手连接"
     override val searchingOpponent = "正在寻找对手 …"
     override val waitingForPlayer = "正在等待另一位也在寻找的玩家。"
@@ -1096,6 +1108,8 @@ object TlTexts : Texts {
     override val cancelConnection = "Kanselahin ang koneksyon"
 
     override val findGameTitle = "Maghanap ng laro"
+    override val anyGame = "Kahit anong laro"
+    override val orPickCount = "… o pumili ng bilang ng kalaban"
     override val onlineSubtitle = "Awtomatikong kumonekta sa isang kalaban"
     override val searchingOpponent = "Naghahanap ng kalaban …"
     override val waitingForPlayer = "Naghihintay ng ibang manlalarong naghahanap din."

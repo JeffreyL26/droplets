@@ -157,7 +157,8 @@ class MainActivity : ComponentActivity() {
 
                 // Online-Matchmaking SOFORT starten — keine Eingabe nötig.
                 // Adresse: optionaler Override, sonst die fest hinterlegte Standard-Adresse.
-                val startMatchmaking: () -> Unit = {
+                // anyGame = true → „Beliebiges Spiel" (Relay sucht/füllt einen offenen Raum).
+                val startMatchmaking: (Boolean) -> Unit = { anyGame ->
                     val url = serverOverride.ifBlank { DEFAULT_RELAY_URL }.trim()
                     isError = false
                     screen  = Screen.ONLINE
@@ -168,7 +169,8 @@ class MainActivity : ComponentActivity() {
                         status  = T.serverNotSetUp
                         isError = true
                     } else {
-                        val finalName = name.trim().ifEmpty { T.defaultNamePlayer }
+                        // Namenlose Spieler werden vom Host durchnummeriert → hier leer lassen.
+                        val finalName = name.trim()
                         val myToken = ++attempt[0]
                         busy   = true
                         mode   = Mode.ONLINE
@@ -176,7 +178,8 @@ class MainActivity : ComponentActivity() {
                         findOnlineMatch(
                             relayUrl = url,
                             name     = finalName,
-                            desiredPlayers = opponentCount + 1,
+                            desiredPlayers = if (anyGame) 0 else opponentCount + 1,
+                            nameFallbackPrefix = T.defaultNamePlayer,
                             token    = myToken,
                             texts    = T,
                             onUpdate = { s, err ->
@@ -209,7 +212,7 @@ class MainActivity : ComponentActivity() {
 
                 if (showSettingsDlg) {
                     SettingsDialog(
-                        version = "Pre-Launch MP240626",
+                        version = "Pre-Launch MP240626.1",
                         soundVolume = soundVolume,
                         soundMuted  = soundMuted,
                         onSoundVolumeChange = { v ->
@@ -280,7 +283,8 @@ class MainActivity : ComponentActivity() {
                       onOpponentCountChange = { opponentCount = it },
                       onBack           = backToMenu,
                       onCancel         = cancel,
-                      onRetry          = startMatchmaking,
+                      onFindAny        = { startMatchmaking(true) },
+                      onRetry          = { startMatchmaking(false) },
                       onEditServer     = { showServerDlg = true }
                   )
 
@@ -301,7 +305,8 @@ class MainActivity : ComponentActivity() {
                     opponentCount  = opponentCount,
                     onOpponentCountChange = { opponentCount = it },
                     onHost = {
-                        val finalName = name.trim().ifEmpty { T.defaultNameHost }
+                        // Namenlose Spieler werden vom Host durchnummeriert → hier leer lassen.
+                        val finalName = name.trim()
                         val myToken = ++attempt[0]
                         busy    = true
                         isError = false
@@ -309,7 +314,7 @@ class MainActivity : ComponentActivity() {
                         status  = T.startingServer
                         // Server-Logs nur ins Logcat (nicht in die lokalisierte Status-Anzeige)
                         val server = GameServer().also { GameHolder.server = it }
-                        server.start(opponentCount + 1)   // Host zählt mit → Gesamtspielerzahl
+                        server.start(opponentCount + 1, T.defaultNamePlayer)   // Host zählt mit → Gesamtspielerzahl
                         connectAsClient(
                             host        = "127.0.0.1",
                             name        = finalName,
@@ -331,7 +336,8 @@ class MainActivity : ComponentActivity() {
                         )
                     },
                     onJoin = {
-                        val finalName = name.trim().ifEmpty { T.defaultNameGuest }
+                        // Namenlose Spieler werden vom Host durchnummeriert → hier leer lassen.
+                        val finalName = name.trim()
                         val ip = hostIp.trim()
                         if (ip.isEmpty()) {
                             status = T.enterHostIp
@@ -423,12 +429,13 @@ class MainActivity : ComponentActivity() {
         relayUrl: String,
         name: String,
         desiredPlayers: Int,
+        nameFallbackPrefix: String,
         token: Int,
         texts: Texts,
         onUpdate: (String, Boolean) -> Unit,
         onSessionStart: () -> Unit
     ) {
-        val client = OnlineGameClient(relayUrl, name, GameHolder.myAvatar, desiredPlayers)
+        val client = OnlineGameClient(relayUrl, name, GameHolder.myAvatar, desiredPlayers, nameFallbackPrefix)
             .also { GameHolder.client = it }
         client.onConnected = { onUpdate(texts.opponentFound, false) }
         client.onError     = { err -> onUpdate(friendlyError(err, Mode.ONLINE, texts), true) }
@@ -746,6 +753,7 @@ private fun OnlineScreen(
     onOpponentCountChange: (Int) -> Unit,
     onBack: () -> Unit,
     onCancel: () -> Unit,
+    onFindAny: () -> Unit,
     onRetry: () -> Unit,
     onEditServer: () -> Unit
 ) {
@@ -862,12 +870,30 @@ private fun OnlineScreen(
                 }
 
                 else -> {
-                    // Erst Gegnerzahl wählen, dann suchen
+                    // Standard-Aktion: direkt in ein beliebiges offenes Spiel.
+                    // Größer & andersfarbig (Koralle) als die Gegnerzahl-Auswahl darunter.
+                    PastelButton(
+                        text = t.anyGame,
+                        emoji = "🎲",
+                        enabled = true,
+                        container = CoralPink,
+                        onClick = onFindAny
+                    )
+                    Spacer(Modifier.height(20.dp))
+                    Text(
+                        text = t.orPickCount,
+                        modifier = Modifier.fillMaxWidth(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = SoftSeaText,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    // Alternativ: feste Gegnerzahl wählen und gezielt einen solchen Raum suchen
                     OpponentCountSelector(
                         count = opponentCount,
                         onCountChange = onOpponentCountChange
                     )
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(12.dp))
                     PastelButton(
                         text = t.findGameTitle,
                         emoji = "🔎",

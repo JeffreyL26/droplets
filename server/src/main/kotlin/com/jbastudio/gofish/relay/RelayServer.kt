@@ -24,7 +24,11 @@ import java.time.Duration
  * Go Fish! — Matchmaking-/Relay-Server (2–4 Spieler).
  *
  * Protokoll (RELAY_PROTOCOL.md):
- *  1. Client → Relay: {"type":"FIND","size":N}   (N = 2–4)
+ *  1. Client → Relay: {"type":"FIND","size":N}
+ *       - N = 2..4  → fester Raum dieser Größe.
+ *       - N = 0      → „Beliebiges Spiel": in den startbereitesten offenen Raum
+ *                      (egal welcher Größe); existiert keiner, wird ein 2-Spieler-
+ *                      Raum eröffnet, dem der nächste Spieler beitreten kann.
  *  2. Relay  → Client: {"type":"MATCHED","role":"HOST|GUEST","playerIndex":0..N-1,"roomSize":N}
  *  3. Routing nach MATCHED:
  *     - 2-Spieler-Raum: Frames 1:1 weiterleiten (Legacy, unverändert).
@@ -37,17 +41,20 @@ import java.time.Duration
 
 private class Peer(val session: WebSocketSession) {
     @Volatile var room: Room? = null
-    var playerIndex: Int = -1
+    @Volatile var playerIndex: Int = -1
 }
 
 private class Room(val size: Int) {
     val peers = ArrayList<Peer>(size)
     @Volatile var matched = false
-    val isFull get() = peers.size == size
+    val hasSpace get() = peers.size < size
+    val isFull   get() = peers.size == size
+    val freeSeats get() = size - peers.size   // je kleiner, desto startbereiter
 }
 
-private val matchMutex  = Mutex()
-private val waitingRooms = mutableMapOf<Int, Room>()   // gewünschte Raumgröße → wartender Raum
+private val matchMutex = Mutex()
+/** Noch nicht gestartete Räume, die auf weitere Spieler warten. */
+private val openRooms  = mutableListOf<Room>()
 
 fun main() {
     val port = System.getenv("PORT")?.toIntOrNull() ?: 8080
@@ -58,11 +65,12 @@ fun main() {
 
 fun Application.relayModule() {
     install(WebSockets) {
-        pingPeriod   = Duration.ofSeconds(15)
+        pingPeriod   = Duration.ofSeconds(15)   // hält NAT/Proxy-Verbindungen offen
         timeout      = Duration.ofSeconds(60)
         maxFrameSize = Long.MAX_VALUE
     }
     routing {
+        // Health-Check / Browser-Test — bestätigt, dass der Server läuft.
         get("/") {
             call.respondText("Go Fish! relay läuft. WebSocket-Endpunkt: /ws")
         }
@@ -75,14 +83,14 @@ fun Application.relayModule() {
                     val room = me.room
                     when {
                         room == null   -> {
-                            // Noch nicht im Matchmaking → FIND-Nachricht auswerten
+                            // Erstes Frame ist die Match-Anfrage (FIND, size:0 = beliebig)
                             val size = runCatching {
-                                JSONObject(text).optInt("size", 2).coerceIn(2, 4)
+                                JSONObject(text).optInt("size", 2)
                             }.getOrDefault(2)
-                            matchOrWait(me, size)
+                            joinOrCreate(me, size)
                         }
                         room.matched   -> routeFrame(me, room, text)
-                        // else: Raum noch nicht voll, weiteres Frame ignorieren
+                        // sonst: Raum offen, aber noch nicht voll → weitere Frames ignorieren
                     }
                 }
             } finally {
@@ -92,35 +100,47 @@ fun Application.relayModule() {
     }
 }
 
-/** Fügt [me] in einen wartenden Raum der gewünschten Größe ein; ist der Raum voll, werden alle gepaart. */
-private suspend fun matchOrWait(me: Peer, requestedSize: Int) {
-    val filledRoom: Room? = matchMutex.withLock {
-        val room = waitingRooms.getOrPut(requestedSize) { Room(requestedSize) }
+/**
+ * Ordnet [me] einem offenen Raum zu. Bei fester Größe (2–4) wird ein passender
+ * offener Raum genutzt bzw. neu eröffnet; bei „beliebig" (alles außerhalb 2–4,
+ * insb. 0) der startbereiteste offene Raum, ersatzweise ein neuer 2-Spieler-Raum.
+ * Füllt der Beitritt den Raum, werden alle Peers gepaart.
+ */
+private suspend fun joinOrCreate(me: Peer, requestedSize: Int) {
+    val filled: Room? = matchMutex.withLock {
+        val room = if (requestedSize in 2..4) {
+            openRooms.firstOrNull { it.size == requestedSize && it.hasSpace }
+                ?: Room(requestedSize).also { openRooms.add(it) }
+        } else {
+            // „Beliebiges Spiel": fülle den startbereitesten Raum, sonst neuer 2er-Raum
+            openRooms.filter { it.hasSpace }.minByOrNull { it.freeSeats }
+                ?: Room(2).also { openRooms.add(it) }
+        }
         me.playerIndex = room.peers.size
         me.room        = room
         room.peers.add(me)
         if (room.isFull) {
-            waitingRooms.remove(requestedSize)
             room.matched = true
+            openRooms.remove(room)
             room
-        } else {
-            null
-        }
+        } else null
     }
-    if (filledRoom != null) {
-        // Alle Peers gleichzeitig mit ihrer Rolle und Index benachrichtigen
-        filledRoom.peers.forEachIndexed { index, peer ->
-            val role = if (index == 0) "HOST" else "GUEST"
-            runCatching {
-                peer.session.send(Frame.Text(
-                    JSONObject()
-                        .put("type",        "MATCHED")
-                        .put("role",        role)
-                        .put("playerIndex", index)
-                        .put("roomSize",    filledRoom.size)
-                        .toString()
-                ))
-            }
+    filled?.let { announceMatched(it) }
+}
+
+/** Schickt jedem Peer des vollen Raums seine Rolle, seinen Index und die Raumgröße. */
+private suspend fun announceMatched(room: Room) {
+    room.peers.forEachIndexed { index, peer ->
+        val role = if (index == 0) "HOST" else "GUEST"
+        runCatching {
+            peer.session.send(Frame.Text(
+                JSONObject()
+                    .put("type",        "MATCHED")
+                    .put("role",        role)
+                    .put("playerIndex", index)
+                    .put("roomSize",    room.size)
+                    .toString()
+            ))
         }
     }
 }
@@ -135,15 +155,15 @@ private suspend fun routeFrame(me: Peer, room: Room, text: String) {
     }
     // 3–4 Spieler: adressiertes Routing
     if (me.playerIndex == 0) {
-        // HOST sendet TO-Envelope → innere Nachricht an Ziel-Peer ausliefern
+        // HOST sendet TO-Umschlag → innere Nachricht an Ziel-Peer ausliefern
         runCatching {
-            val env    = JSONObject(text)
-            val toIdx  = env.getInt("to")
-            val inner  = env.getJSONObject("msg").toString()
+            val env   = JSONObject(text)
+            val toIdx = env.getInt("to")
+            val inner = env.getJSONObject("msg").toString()
             room.peers.getOrNull(toIdx)?.session?.send(Frame.Text(inner))
         }
     } else {
-        // GUEST sendet rohen Frame → in FROM-Envelope einwickeln und an HOST schicken
+        // GUEST sendet rohen Frame → in FROM-Umschlag einwickeln und an HOST schicken
         runCatching {
             val envelope = JSONObject()
                 .put("type", "FROM")
@@ -161,9 +181,10 @@ private suspend fun cleanup(me: Peer) {
         val r = me.room ?: return@withLock (null to false)
         me.room = null
         if (!r.matched) {
-            // Raum noch im Wartebereich → diesen Peer entfernen
+            // Raum wartet noch → Peer entfernen, übrige Indizes neu vergeben (kein MATCHED verschickt)
             r.peers.remove(me)
-            if (r.peers.isEmpty()) waitingRooms.remove(r.size)
+            if (r.peers.isEmpty()) openRooms.remove(r)
+            else r.peers.forEachIndexed { i, p -> p.playerIndex = i }
         }
         r to r.matched
     }

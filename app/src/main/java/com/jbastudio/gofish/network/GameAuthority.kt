@@ -33,6 +33,13 @@ class GameAuthority {
     /** Erwartete Spielerzahl (vom Host gesetzt). Spielstart, sobald erreicht. */
     var expectedPlayers: Int = 2
 
+    /**
+     * Lokalisierter Präfix für namenlose Spieler. Wer ohne Namen beitritt, wird als
+     * "<Präfix> <Sitznummer>" geführt (z. B. „Spieler 1", „Spieler 2") — eindeutig
+     * und für alle Clients identisch, da der Host die Namen zentral vergibt.
+     */
+    var nameFallbackPrefix: String = "Player"
+
     /** Schickt eine Nachricht an genau einen Spieler (per ID). */
     var send:  ((Int, JSONObject) -> Unit)? = null
     var onLog: ((String) -> Unit)?          = null
@@ -43,10 +50,12 @@ class GameAuthority {
     /** Ein Spieler tritt bei. Sobald [expectedPlayers] da sind, startet das Spiel genau einmal. */
     fun playerJoin(pid: Int, name: String, avatarKind: String, avatarColor: String) {
         synchronized(engine) {
+            // Namenlose Spieler durchnummerieren (z. B. „Spieler 1") → eindeutig im Log/Tippen.
+            val resolvedName = name.trim().ifBlank { "$nameFallbackPrefix ${pid + 1}" }
             avatars[pid] = AvatarMeta(avatarKind, avatarColor)
-            engine.addPlayer(pid, name)
+            engine.addPlayer(pid, resolvedName)
             joined.add(pid)
-            log("Spieler $pid beigetreten: $name ($avatarKind/$avatarColor)")
+            log("Spieler $pid beigetreten: $resolvedName ($avatarKind/$avatarColor)")
 
             send?.invoke(pid, JSONObject().apply {
                 put("type", Protocol.JOINED)

@@ -10,7 +10,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -134,7 +133,10 @@ class GameActivity : ComponentActivity() {
         state.selectedRank = null
         state.selectedTargetId = null
         parsePlayers(msg)
-        state.appendSystem(T.gameStartedAs(GameHolder.client?.playerName.orEmpty()))
+        // Eigener Anzeigename kommt aus der Spielerliste (kann vom Host nummeriert sein);
+        // Fallback auf den lokal gewählten Namen.
+        val shownName = state.myName.ifBlank { GameHolder.client?.playerName.orEmpty() }
+        state.appendSystem(T.gameStartedAs(shownName))
     }
 
     private fun parseAvatar(kindStr: String, colorStr: String): AvatarChoice {
@@ -150,7 +152,7 @@ class GameActivity : ComponentActivity() {
         for (i in 0 until arr.length()) {
             val o = arr.getJSONObject(i)
             val id = o.getInt("id")
-            if (id == state.myId) continue
+            if (id == state.myId) { state.myName = o.optString("name"); continue }
             list.add(
                 OpponentInfo(
                     id       = id,
@@ -350,6 +352,8 @@ data class OpponentInfo(
 class GameUiState {
     var myAvatar         by mutableStateOf(AvatarChoice())
     var myId             by mutableStateOf(-1)
+    /** Eigener (ggf. vom Host vergebener) Anzeigename — aus der Spielerliste übernommen. */
+    var myName           by mutableStateOf("")
     /** Alle Gegner (1–3), in Sitzreihenfolge. */
     var opponents        by mutableStateOf<List<OpponentInfo>>(emptyList())
     /** Wer ist gerade am Zug (Spieler-ID). */
@@ -677,10 +681,10 @@ private fun OpponentPanel(
         else        -> LavenderDeep.copy(alpha = 0.85f)
     }
     val fg = Foam.copy(alpha = if (opp.active) 1f else 0.55f)
-    val panelMod = (if (compact) modifier else modifier.fillMaxWidth())
-        .then(if (selectable) Modifier.clickable { onClick() } else Modifier)
+    val panelMod = if (compact) modifier else modifier.fillMaxWidth()
 
-    BubblePanel(modifier = panelMod, background = bg) {
+    // onClick liegt im BubblePanel hinter dem Clip → Aufleuchten folgt der Panel-Form.
+    BubblePanel(modifier = panelMod, background = bg, onClick = if (selectable) onClick else null) {
         if (compact) {
             Column(
                 modifier = Modifier.fillMaxWidth().padding(10.dp),

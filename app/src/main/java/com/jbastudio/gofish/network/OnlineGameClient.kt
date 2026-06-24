@@ -30,7 +30,10 @@ class OnlineGameClient(
     relayUrl: String,
     override val playerName: String,
     private val avatar: AvatarChoice = AvatarChoice(),
-    private val desiredPlayers: Int = 2
+    /** Gewünschte Spielerzahl (2–4) oder 0 für „Beliebiges Spiel" (Relay wählt den Raum). */
+    private val desiredPlayers: Int = 2,
+    /** Lokalisierter Präfix für namenlose Spieler (nur als Host genutzt). */
+    private val nameFallbackPrefix: String = "Player"
 ) : GameSession {
 
     companion object {
@@ -97,6 +100,7 @@ class OnlineGameClient(
             // Wir sind der Host → Spiel-Autorität in-process aufsetzen.
             val auth = GameAuthority()
             auth.expectedPlayers = roomSize
+            auth.nameFallbackPrefix = nameFallbackPrefix
             auth.onLog = { Log.d(TAG, it) }
             auth.send = { pid, message ->
                 when {

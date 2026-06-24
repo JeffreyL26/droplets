@@ -17,10 +17,17 @@ und werden vom Relay nur **weitergeleitet**, nicht interpretiert.
 ### Client → Relay: `FIND`
 ```jsonc
 { "type": "FIND", "size": 3 }     // size = gewünschte Gesamt-Spielerzahl (2–4)
+{ "type": "FIND", "size": 0 }     // size = 0 → „Beliebiges Spiel" (irgendein offener Raum)
 ```
 Das Relay sammelt wartende Clients **nach gewünschter `size`** und bildet einen
 Raum, sobald `size` Clients mit derselben `size` warten. (size 2 nur mit size 2,
 size 3 nur mit size 3, usw.)
+
+**`size == 0` („Beliebiges Spiel"):** Das Relay setzt den Client in den **start-
+bereitesten offenen Raum** (wenigste freie Plätze, egal welcher Zielgröße). Gibt es
+keinen offenen Raum, eröffnet es einen **2-Spieler-Raum**, dem der nächste Spieler
+beitritt. So füllt „Beliebiges Spiel" bestehende Lobbys (z. B. eine 4-Spieler-Lobby
+mit erst 2 Spielern) und matcht zwei wartende „Beliebig"-Spieler als 1v1.
 
 ### Relay → Client: `MATCHED` (an jeden Spieler im vollen Raum)
 ```jsonc
@@ -86,7 +93,8 @@ Für `roomSize == 2` darf `playerIndex` entfallen (Legacy).
 ---
 
 ## 4. Server-Pflichten (Zusammenfassung)
-1. `FIND {size}` puffern und Räume **gleicher** `size` bilden.
+1. `FIND {size}` puffern und Räume **gleicher** `size` bilden. `size == 0` →
+   in den startbereitesten offenen Raum einreihen, sonst neuen 2-Spieler-Raum.
 2. Bei vollem Raum `MATCHED {role, playerIndex, roomSize}` an alle senden
    (genau 1 HOST mit Index 0).
 3. `roomSize == 2`: Frames 1:1 weiterleiten (Legacy).
